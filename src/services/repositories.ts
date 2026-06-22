@@ -184,3 +184,34 @@ export async function saveCompany(values: { id?: Id; name: string; active: boole
   const { error } = values.id ? await supabase.from('companies').update(values).eq('id', values.id) : await supabase.from('companies').insert(values);
   if (error) throw error;
 }
+
+export async function hasCompanyData(companyId: Id) {
+  try {
+    // Verificar em cada tabela se há dados vinculados
+    const [studios, platforms, stays, expenseTypes, expenseEntries, cashEntries, notes, companyUsers] = await Promise.all([
+      supabase.from('studios').select('id', { count: 'exact', head: true }).eq('company_id', companyId).is('deleted_at', null),
+      supabase.from('platforms').select('id', { count: 'exact', head: true }).eq('company_id', companyId),
+      supabase.from('stays').select('id', { count: 'exact', head: true }).eq('company_id', companyId).is('deleted_at', null),
+      supabase.from('expense_types').select('id', { count: 'exact', head: true }).eq('company_id', companyId).is('deleted_at', null),
+      supabase.from('expense_entries').select('id', { count: 'exact', head: true }).eq('company_id', companyId),
+      supabase.from('cash_entries').select('id', { count: 'exact', head: true }).eq('company_id', companyId),
+      supabase.from('notes').select('id', { count: 'exact', head: true }).eq('company_id', companyId).is('deleted_at', null),
+      supabase.from('company_users').select('id', { count: 'exact', head: true }).eq('company_id', companyId)
+    ]);
+
+    const totalCount =
+      (studios.count || 0) +
+      (platforms.count || 0) +
+      (stays.count || 0) +
+      (expenseTypes.count || 0) +
+      (expenseEntries.count || 0) +
+      (cashEntries.count || 0) +
+      (notes.count || 0) +
+      (companyUsers.count || 0);
+
+    return totalCount > 0;
+  } catch (error) {
+    console.error('Erro ao verificar dados da empresa:', error);
+    return true; // Se houver erro, assume que tem dados para segurança
+  }
+}

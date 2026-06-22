@@ -1,6 +1,6 @@
 import { escapeHtml, qs, toast } from '../components/dom';
 import { appShell, pageHeader } from '../components/layout';
-import { listCompaniesAdmin, saveCompany, softDelete } from '../services/repositories';
+import { listCompaniesAdmin, saveCompany, softDelete, hasCompanyData } from '../services/repositories';
 import { Company } from '../types';
 import { state, emit } from '../state/app-state';
 
@@ -67,6 +67,13 @@ export function bindCompanies(refresh: () => void) {
     // Validar: não permitir excluir a empresa atual
     if (state.company?.id === deletedId) {
       toast('Você não pode excluir a empresa atual.', 'error');
+      return;
+    }
+    
+    // Validar: não permitir excluir empresa com dados vinculados
+    const hasData = await hasCompanyData(deletedId);
+    if (hasData) {
+      toast('Não é possível excluir uma empresa com dados vinculados.', 'error');
       return;
     }
     
