@@ -1,0 +1,186 @@
+import { supabase } from './supabase';
+import { CashEntry, CompanyUser, ExpenseEntry, ExpenseType, Id, Note, Platform, Stay, Studio } from '../types';
+import { monthBounds, pad } from '../utils/date';
+
+function companyRequired(companyId?: Id | null) {
+  if (!companyId) throw new Error('Selecione uma empresa no Perfil para continuar.');
+  return companyId;
+}
+
+export async function listPlatforms(companyId: Id) {
+  const { data, error } = await supabase.from('platforms').select('*').eq('company_id', companyId).eq('active', true).order('name');
+  if (error) throw error;
+  return data as Platform[];
+}
+
+export async function listStudios(companyId: Id) {
+  const { data, error } = await supabase
+    .from('studios')
+    .select('*')
+    .eq('company_id', companyId)
+    .is('deleted_at', null)
+    .order('name');
+  if (error) throw error;
+  return data as Studio[];
+}
+
+export async function saveStudio(companyId: Id, values: Partial<Studio>) {
+  const payload = { ...values, company_id: companyRequired(companyId) };
+  const { error } = values.id ? await supabase.from('studios').update(payload).eq('id', values.id) : await supabase.from('studios').insert(payload);
+  if (error) throw error;
+}
+
+export async function softDelete(table: string, id: Id) {
+  const { error } = await supabase.from(table).update({ deleted_at: new Date().toISOString(), active: false }).eq('id', id);
+  if (error) throw error;
+}
+
+export async function listStays(companyId: Id, filters: Record<string, string> = {}) {
+  let query = supabase
+    .from('stays')
+    .select('*,studios(*),platforms(*)')
+    .eq('company_id', companyId)
+    .is('deleted_at', null)
+    .order('check_in_at', { ascending: false });
+
+  if (filters.studio_id) query = query.eq('studio_id', filters.studio_id);
+  if (filters.platform_id) query = query.eq('platform_id', filters.platform_id);
+  if (filters.reservation_status) query = query.eq('reservation_status', filters.reservation_status);
+  if (filters.payment_status) query = query.eq('payment_status', filters.payment_status);
+  if (filters.start) query = query.gte('check_in_at', `${filters.start}T00:00:00`);
+  if (filters.end) query = query.lte('check_in_at', `${filters.end}T23:59:59`);
+  if (filters.q) query = query.ilike('guests_names', `%${filters.q}%`);
+
+  const { data, error } = await query;
+  if (error) throw error;
+  return data as Stay[];
+}
+
+export async function listMonthStays(companyId: Id, year: number, month: number) {
+  const { start, end } = monthBounds({ year, month });
+  const { data, error } = await supabase
+    .from('stays')
+    .select('*,studios(*),platforms(*)')
+    .eq('company_id', companyId)
+    .is('deleted_at', null)
+    .lt('check_in_at', `${end}T23:59:59`)
+    .gt('check_out_at', `${start}T00:00:00`)
+    .order('check_in_at');
+  if (error) throw error;
+  return data as Stay[];
+}
+
+export async function hasStayConflict(companyId: Id, studioId: Id, checkIn: string, checkOut: string, stayId?: Id) {
+  let query = supabase
+    .from('stays')
+    .select('id')
+    .eq('company_id', companyId)
+    .eq('studio_id', studioId)
+    .is('deleted_at', null)
+    .lt('check_in_at', checkOut)
+    .gt('check_out_at', checkIn)
+    .limit(1);
+  if (stayId) query = query.neq('id', stayId);
+  const { data, error } = await query;
+  if (error) throw error;
+  return (data ?? []).length > 0;
+}
+
+export async function saveStay(companyId: Id, values: Partial<Stay>) {
+  const payload = { ...values, company_id: companyRequired(companyId) };
+  const conflict = await hasStayConflict(companyId, payload.studio_id!, payload.check_in_at!, payload.check_out_at!, payload.id);
+  if (conflict) throw new Error('Já existe uma hospedagem com período sobreposto para este studio.');
+  const { error } = values.id ? await supabase.from('stays').update(payload).eq('id', values.id) : await supabase.from('stays').insert(payload);
+  if (error) throw error;
+}
+
+export async function listExpenseTypes(companyId: Id) {
+  const { data, error } = await supabase.rpc('expense_types_with_studios', { p_company_id: companyId });
+  if (error) throw error;
+  return data as ExpenseType[];
+}
+
+export async function saveExpenseType(companyId: Id, values: Partial<ExpenseType>, studioIds: Id[]) {
+  const { data, error } = await supabase
+    .from('expense_types')
+    .upsert({ id: values.id, company_id: companyId, name: values.name, active: values.active ?? true }, { onConflict: 'id' })
+    .select('id')
+    .single();
+  if (error) throw error;
+  const expenseTypeId = data.id as Id;
+  await supabase.from('expense_type_studios').delete().eq('expense_type_id', expenseTypeId);
+  if (studioIds.length) {
+    const { error: linkError } = await supabase.from('expense_type_studios').insert(studioIds.map((studio_id) => ({ expense_type_id: expenseTypeId, studio_id })));
+    if (linkError) throw linkError;
+  }
+}
+
+export async function listExpenseEntries(companyId: Id, year: number, month: number) {
+  const reference = `${year}-${pad(month)}-01`;
+  const { data, error } = await supabase
+    .from('expense_entries')
+    .select('*,expense_types(*),studios(*)')
+    .eq('company_id', companyId)
+    .eq('reference_month', reference)
+    .order('created_at', { ascending: false });
+  if (error) throw error;
+  return data as ExpenseEntry[];
+}
+
+export async function saveExpenseEntry(companyId: Id, values: Partial<ExpenseEntry>) {
+  const payload = { ...values, company_id: companyId };
+  const { error } = values.id ? await supabase.from('expense_entries').update(payload).eq('id', values.id) : await supabase.from('expense_entries').insert(payload);
+  if (error) throw error;
+}
+
+export async function listCashEntries(companyId: Id, year?: number, month?: number) {
+  let query = supabase.from('cash_entries').select('*').eq('company_id', companyId).order('entry_date', { ascending: false });
+  if (year && month) {
+    const { start, end } = monthBounds({ year, month });
+    query = query.gte('entry_date', start).lte('entry_date', end);
+  }
+  const { data, error } = await query;
+  if (error) throw error;
+  return data as CashEntry[];
+}
+
+export async function saveCashEntry(companyId: Id, values: Partial<CashEntry>) {
+  const payload = { ...values, company_id: companyId };
+  const { error } = values.id ? await supabase.from('cash_entries').update(payload).eq('id', values.id) : await supabase.from('cash_entries').insert(payload);
+  if (error) throw error;
+}
+
+export async function listNotes(companyId: Id) {
+  const { data, error } = await supabase.from('notes').select('*').eq('company_id', companyId).is('deleted_at', null).order('updated_at', { ascending: false });
+  if (error) throw error;
+  return data as Note[];
+}
+
+export async function saveNote(companyId: Id, values: Partial<Note>) {
+  const payload = { ...values, company_id: companyId };
+  const { error } = values.id ? await supabase.from('notes').update(payload).eq('id', values.id) : await supabase.from('notes').insert(payload);
+  if (error) throw error;
+}
+
+export async function listCompanyUsers(companyId: Id) {
+  const { data, error } = await supabase.from('company_users').select('*').eq('company_id', companyId).order('email');
+  if (error) throw error;
+  return data as CompanyUser[];
+}
+
+export async function saveCompanyUser(companyId: Id, values: Partial<CompanyUser>) {
+  const payload = { ...values, company_id: companyId };
+  const { error } = values.id ? await supabase.from('company_users').update(payload).eq('id', values.id) : await supabase.from('company_users').insert(payload);
+  if (error) throw error;
+}
+
+export async function listCompaniesAdmin() {
+  const { data, error } = await supabase.from('companies').select('*').is('deleted_at', null).order('name');
+  if (error) throw error;
+  return data;
+}
+
+export async function saveCompany(values: { id?: Id; name: string; active: boolean }) {
+  const { error } = values.id ? await supabase.from('companies').update(values).eq('id', values.id) : await supabase.from('companies').insert(values);
+  if (error) throw error;
+}

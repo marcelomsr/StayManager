@@ -1,0 +1,156 @@
+import { PAYMENT_STATUS_OPTIONS, RESERVATION_STATUS_OPTIONS } from '../config';
+import { escapeHtml, qs, toast } from '../components/dom';
+import { appShell, pageHeader } from '../components/layout';
+import { listPlatforms, listStays, listStudios, saveStay, softDelete } from '../services/repositories';
+import { state } from '../state/app-state';
+import { Platform, Stay, Studio } from '../types';
+import { calculateNights, isWithinNextDays, toDateInput, toDateTimeInput, weekday } from '../utils/date';
+import { brl, numberValue, optionalNumberValue } from '../utils/format';
+
+let stays: Stay[] = [];
+let studios: Studio[] = [];
+let platforms: Platform[] = [];
+
+export async function renderHospedagens() {
+  if (!state.company) return appShell('');
+  const params = new URLSearchParams(state.route.split('?')[1] ?? '');
+  const filters = Object.fromEntries(params.entries());
+  [studios, platforms, stays] = await Promise.all([listStudios(state.company.id), listPlatforms(state.company.id), listStays(state.company.id, filters)]);
+  const edit = stays.find((stay) => stay.id === params.get('id'));
+  return appShell(`
+    ${pageHeader('Hospedagens')}
+    <section class="panel">
+      <form id="stay-filters" class="filters">
+        <select name="studio_id"><option value="">Studio</option>${studios.map((item) => `<option value="${item.id}" ${filters.studio_id === item.id ? 'selected' : ''}>${escapeHtml(item.name)}</option>`).join('')}</select>
+        <select name="platform_id"><option value="">Plataforma</option>${platforms.map((item) => `<option value="${item.id}" ${filters.platform_id === item.id ? 'selected' : ''}>${escapeHtml(item.name)}</option>`).join('')}</select>
+        <select name="reservation_status"><option value="">Status reserva</option>${RESERVATION_STATUS_OPTIONS.map((item) => `<option ${filters.reservation_status === item.name ? 'selected' : ''}>${item.name}</option>`).join('')}</select>
+        <select name="payment_status"><option value="">Pagamento</option>${PAYMENT_STATUS_OPTIONS.map((item) => `<option ${filters.payment_status === item.name ? 'selected' : ''}>${item.name}</option>`).join('')}</select>
+        <input type="date" name="start" value="${filters.start ?? ''}" />
+        <input type="date" name="end" value="${filters.end ?? ''}" />
+        <input name="q" placeholder="Hóspede" value="${escapeHtml(filters.q ?? '')}" />
+        <button>Filtrar</button>
+      </form>
+    </section>
+    <section class="split wide-left">
+      ${stayForm(edit)}
+      <section class="panel table-wrap">
+        <table>
+          <thead><tr><th>Entrada</th><th>Saída</th><th>Dia da saída</th><th>Studio</th><th>Hóspedes</th><th>Diárias</th><th>Plataforma</th><th>Status</th><th>Total</th><th>Líquido</th><th>Diária</th><th></th></tr></thead>
+          <tbody>${stays.map((stay) => `
+            <tr class="${isWithinNextDays(stay.check_in_at, 7) ? 'upcoming' : ''}">
+              <td>${new Date(stay.check_in_at).toLocaleString('pt-BR')}</td>
+              <td>${new Date(stay.check_out_at).toLocaleString('pt-BR')}</td>
+              <td>${weekday(stay.check_out_at)}</td>
+              <td>${escapeHtml(stay.studios?.name)}</td>
+              <td>${escapeHtml(stay.guests_names)}</td>
+              <td>${stay.nights_count}</td>
+              <td>${badge(stay.platforms?.name ?? '', stay.platforms?.color)}</td>
+              <td>${badge(stay.reservation_status, RESERVATION_STATUS_OPTIONS.find((item) => item.name === stay.reservation_status)?.color)}</td>
+              <td>${brl(stay.total_amount)}</td>
+              <td>${brl(stay.net_amount)}</td>
+              <td>${brl(stay.daily_amount)}</td>
+              <td class="row-actions"><button data-edit="${stay.id}">Editar</button><button class="danger" data-delete="${stay.id}">Excluir</button></td>
+            </tr>`).join('')}</tbody>
+        </table>
+      </section>
+    </section>
+  `);
+}
+
+function stayForm(stay?: Stay) {
+  const studio = studios.find((item) => item.id === stay?.studio_id);
+  return `
+    <form id="stay-form" class="panel form-grid">
+      <h2>${stay ? 'Editar hospedagem' : 'Nova hospedagem'}</h2>
+      <input type="hidden" name="id" value="${stay?.id ?? ''}" />
+      <label>Studio <select name="studio_id" required>${studios.map((item) => `<option value="${item.id}" ${stay?.studio_id === item.id ? 'selected' : ''}>${escapeHtml(item.name)}</option>`).join('')}</select></label>
+      <label>Entrada <input type="datetime-local" name="check_in_at" value="${toDateTimeInput(stay?.check_in_at)}" required /></label>
+      <label>Saída <input type="datetime-local" name="check_out_at" value="${toDateTimeInput(stay?.check_out_at)}" required /></label>
+      <label>Hóspedes <textarea name="guests_names" required>${escapeHtml(stay?.guests_names)}</textarea></label>
+      <label>Qtd. hóspedes <input type="number" min="1" name="guests_count" value="${stay?.guests_count ?? 1}" /></label>
+      <label>Data reserva <input type="date" name="reservation_date" value="${toDateInput(stay?.reservation_date)}" /></label>
+      <label>Qtd. diárias <input type="number" min="0" name="nights_count" value="${stay?.nights_count ?? ''}" /></label>
+      <label>Plataforma <select name="platform_id" required>${platforms.map((item) => `<option value="${item.id}" ${stay?.platform_id === item.id ? 'selected' : ''}>${escapeHtml(item.name)}</option>`).join('')}</select></label>
+      <label>Status reserva <select name="reservation_status">${RESERVATION_STATUS_OPTIONS.map((item) => `<option ${stay?.reservation_status === item.name ? 'selected' : ''}>${item.name}</option>`).join('')}</select></label>
+      <label>Observação <textarea name="notes">${escapeHtml(stay?.notes)}</textarea></label>
+      <label class="garage-field ${studio?.has_garage ? '' : 'hidden'}">Informações do carro <textarea name="car_info">${escapeHtml(stay?.car_info)}</textarea></label>
+      <label>Valor total <input name="total_amount" inputmode="decimal" value="${stay?.total_amount ?? 0}" /></label>
+      <label>Taxas <input name="fees_amount" inputmode="decimal" value="${stay?.fees_amount ?? 0}" /></label>
+      <label>Valor líquido <input name="net_amount" inputmode="decimal" value="${stay?.net_amount ?? ''}" /></label>
+      <label>Valor diária <input name="daily_amount" inputmode="decimal" value="${stay?.daily_amount ?? ''}" /></label>
+      <label>Status pagamento <select name="payment_status">${PAYMENT_STATUS_OPTIONS.map((item) => `<option ${stay?.payment_status === item.name ? 'selected' : ''}>${item.name}</option>`).join('')}</select></label>
+      <button class="primary">Salvar hospedagem</button>
+    </form>`;
+}
+
+function badge(label: string, color = '#d8dde8') {
+  return `<span class="badge" style="--badge:${color}">${escapeHtml(label)}</span>`;
+}
+
+export function bindHospedagens(refresh: () => void) {
+  const filterForm = qs<HTMLFormElement>('#stay-filters');
+  filterForm?.addEventListener('submit', (event) => {
+    event.preventDefault();
+    const params = new URLSearchParams();
+    new FormData(filterForm).forEach((value, key) => {
+      if (String(value)) params.set(key, String(value));
+    });
+    location.hash = `/hospedagens?${params.toString()}`;
+  });
+  document.querySelectorAll<HTMLButtonElement>('[data-edit]').forEach((button) => button.addEventListener('click', () => {
+    location.hash = `/hospedagens?id=${button.dataset.edit}`;
+  }));
+  document.querySelectorAll<HTMLButtonElement>('[data-delete]').forEach((button) => button.addEventListener('click', async () => {
+    await softDelete('stays', button.dataset.delete!);
+    refresh();
+  }));
+
+  const form = qs<HTMLFormElement>('#stay-form');
+  if (!form) return;
+  const recalc = () => {
+    const checkIn = (form.check_in_at as HTMLInputElement).value;
+    const checkOut = (form.check_out_at as HTMLInputElement).value;
+    const nights = calculateNights(checkIn, checkOut);
+    if (!(form.nights_count as HTMLInputElement).value) (form.nights_count as HTMLInputElement).value = String(nights);
+    const total = numberValue(new FormData(form).get('total_amount'));
+    const fees = numberValue(new FormData(form).get('fees_amount'));
+    if (!(form.net_amount as HTMLInputElement).dataset.manual) (form.net_amount as HTMLInputElement).value = String(total - fees);
+    const net = optionalNumberValue(new FormData(form).get('net_amount'));
+    const currentNights = Number((form.nights_count as HTMLInputElement).value);
+    if (!(form.daily_amount as HTMLInputElement).dataset.manual) (form.daily_amount as HTMLInputElement).value = currentNights > 0 && net !== null ? String((net / currentNights).toFixed(2)) : '';
+  };
+  ['check_in_at', 'check_out_at', 'total_amount', 'fees_amount', 'nights_count'].forEach((name) => form[name].addEventListener('input', recalc));
+  form.net_amount.addEventListener('input', () => (form.net_amount.dataset.manual = 'true'));
+  form.daily_amount.addEventListener('input', () => (form.daily_amount.dataset.manual = 'true'));
+  form.studio_id.addEventListener('change', () => {
+    const studio = studios.find((item) => item.id === form.studio_id.value);
+    qs<HTMLElement>('.garage-field', form)?.classList.toggle('hidden', !studio?.has_garage);
+  });
+  form.addEventListener('submit', async (event) => {
+    event.preventDefault();
+    recalc();
+    const data = new FormData(form);
+    await saveStay(state.company!.id, {
+      id: String(data.get('id') || '') || undefined,
+      studio_id: String(data.get('studio_id')),
+      platform_id: String(data.get('platform_id')),
+      check_in_at: String(data.get('check_in_at')),
+      check_out_at: String(data.get('check_out_at')),
+      guests_names: String(data.get('guests_names')),
+      guests_count: Number(data.get('guests_count') || 1),
+      reservation_date: String(data.get('reservation_date') || '') || null,
+      nights_count: Number(data.get('nights_count') || 0),
+      reservation_status: String(data.get('reservation_status')),
+      notes: String(data.get('notes') || '') || null,
+      car_info: String(data.get('car_info') || '') || null,
+      total_amount: numberValue(data.get('total_amount')),
+      fees_amount: numberValue(data.get('fees_amount')),
+      net_amount: optionalNumberValue(data.get('net_amount')),
+      daily_amount: Number(data.get('nights_count') || 0) > 0 ? optionalNumberValue(data.get('daily_amount')) : null,
+      payment_status: String(data.get('payment_status'))
+    });
+    toast('Hospedagem salva.');
+    location.hash = '/hospedagens';
+    refresh();
+  });
+}
