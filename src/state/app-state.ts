@@ -101,19 +101,31 @@ export async function loadSessionContext() {
 
   state.companies = (companies ?? []) as Company[];
   const storedCompanyId = sessionStorage.getItem('staymanager.company_id');
-  state.company = state.companies.find((company) => company.id === storedCompanyId) ?? state.companies[0] ?? null;
+  // Validar que a empresa armazenada ainda está na lista de empresas permitidas
+  const storedCompany = state.companies.find((company) => company.id === storedCompanyId);
+  state.company = storedCompany ?? state.companies[0] ?? null;
   if (state.company) sessionStorage.setItem('staymanager.company_id', state.company.id);
+  else sessionStorage.removeItem('staymanager.company_id'); // Remover se não tem acesso
   state.loading = false;
   emit();
 }
 
 export function setCompany(companyId: string) {
-  const company = state.companies.find((item) => item.id === companyId) ?? null;
+  // Validar que o companyId está realmente na lista de empresas do usuário
+  const company = state.companies.find((item) => item.id === companyId);
+  if (!company) {
+    console.error('Tentativa de acesso não autorizado à empresa:', companyId);
+    return;
+  }
   state.company = company;
-  if (company) sessionStorage.setItem('staymanager.company_id', company.id);
+  sessionStorage.setItem('staymanager.company_id', company.id);
   emit();
 }
 
 export function isCompanyActive(): boolean {
   return state.company?.active ?? false;
+}
+
+export function hasAccessToCompany(companyId: string): boolean {
+  return state.companies.some((company) => company.id === companyId);
 }

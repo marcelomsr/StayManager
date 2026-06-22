@@ -1,6 +1,6 @@
 import { escapeHtml, qs, toast } from '../components/dom';
 import { appShell, pageHeader } from '../components/layout';
-import { listCompaniesAdmin, saveCompany, softDelete, hasCompanyData } from '../services/repositories';
+import { listCompaniesAdmin, saveCompany, softDelete, hasCompanyData, deleteCompany } from '../services/repositories';
 import { Company } from '../types';
 import { state, emit } from '../state/app-state';
 
@@ -77,7 +77,7 @@ export function bindCompanies(refresh: () => void) {
       return;
     }
     
-    await softDelete('companies', deletedId);
+    await deleteCompany(deletedId);
     
     // Atualizar o estado: remover empresa deletada da lista
     state.companies = state.companies.filter((c) => c.id !== deletedId);

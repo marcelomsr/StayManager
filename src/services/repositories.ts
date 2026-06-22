@@ -1,9 +1,11 @@
 import { supabase } from './supabase';
 import { CashEntry, CompanyUser, ExpenseEntry, ExpenseType, Id, Note, Platform, Stay, Studio } from '../types';
 import { monthBounds, pad } from '../utils/date';
+import { hasAccessToCompany, state } from '../state/app-state';
 
 function companyRequired(companyId?: Id | null) {
   if (!companyId) throw new Error('Selecione uma empresa no Perfil para continuar.');
+  if (!hasAccessToCompany(companyId)) throw new Error('Você não tem acesso a esta empresa.');
   return companyId;
 }
 
@@ -175,17 +177,26 @@ export async function saveCompanyUser(companyId: Id, values: Partial<CompanyUser
 }
 
 export async function listCompaniesAdmin() {
+  if (!state.user?.is_super_admin) {
+    throw new Error('Você não tem permissão para acessar esta funcionalidade.');
+  }
   const { data, error } = await supabase.from('companies').select('*').is('deleted_at', null).order('name');
   if (error) throw error;
   return data;
 }
 
 export async function saveCompany(values: { id?: Id; name: string; active: boolean }) {
+  if (!state.user?.is_super_admin) {
+    throw new Error('Você não tem permissão para acessar esta funcionalidade.');
+  }
   const { error } = values.id ? await supabase.from('companies').update(values).eq('id', values.id) : await supabase.from('companies').insert(values);
   if (error) throw error;
 }
 
 export async function hasCompanyData(companyId: Id) {
+  if (!state.user?.is_super_admin) {
+    throw new Error('Você não tem permissão para acessar esta funcionalidade.');
+  }
   try {
     // Verificar em cada tabela se há dados vinculados
     const [studios, platforms, stays, expenseTypes, expenseEntries, cashEntries, notes, companyUsers] = await Promise.all([
@@ -214,4 +225,12 @@ export async function hasCompanyData(companyId: Id) {
     console.error('Erro ao verificar dados da empresa:', error);
     return true; // Se houver erro, assume que tem dados para segurança
   }
+}
+
+export async function deleteCompany(companyId: Id) {
+  if (!state.user?.is_super_admin) {
+    throw new Error('Você não tem permissão para acessar esta funcionalidade.');
+  }
+  const { error } = await supabase.from('companies').update({ deleted_at: new Date().toISOString(), active: false }).eq('id', companyId);
+  if (error) throw error;
 }

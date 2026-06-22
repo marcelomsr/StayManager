@@ -15,11 +15,20 @@ const routes = [
 ];
 
 export function appShell(content: string) {
+  // Filtrar rotas baseado em permissões
+  const visibleRoutes = routes.filter(([route]) => {
+    const adminRoutes = ['/empresas', '/usuarios'];
+    if (adminRoutes.includes(route) && !state.user?.is_super_admin) {
+      return false;
+    }
+    return true;
+  });
+  
   return html`
     <aside class="sidebar">
       <div class="brand">StayManager</div>
       <nav>
-        ${routes.map(([route, label]) => `<button class="${state.route === route ? 'active' : ''}" data-route="${route}">${label}</button>`).join('')}
+        ${visibleRoutes.map(([route, label]) => `<button class="${state.route === route ? 'active' : ''}" data-route="${route}">${label}</button>`).join('')}
       </nav>
     </aside>
     <main class="main">

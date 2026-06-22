@@ -37,6 +37,14 @@ async function render() {
 
     const route = state.route.split('?')[0];
     const refresh = () => render();
+    
+    // Proteger rotas administrativas
+    const adminRoutes = ['/empresas', '/usuarios'];
+    if (adminRoutes.includes(route) && !state.user?.is_super_admin) {
+      location.hash = '/dashboard';
+      return;
+    }
+    
     if (route === '/dashboard') {
       app.innerHTML = await renderDashboard();
       bindDashboard();
