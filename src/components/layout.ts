@@ -30,7 +30,7 @@ export function appShell(content: string) {
         </div>
         <div class="top-actions">
           <select id="company-switcher" ${state.companies.length ? '' : 'disabled'}>
-            ${state.companies.map((company) => `<option value="${company.id}" ${state.company?.id === company.id ? 'selected' : ''}>${escapeHtml(company.name)}</option>`).join('')}
+            ${state.companies.map((company) => `<option value="${company.id}" ${state.company?.id === company.id ? 'selected' : ''}>${escapeHtml(company.name)}${!company.active ? ' (inativo)' : ''}</option>`).join('')}
           </select>
           <button class="ghost" id="logout">Sair</button>
         </div>

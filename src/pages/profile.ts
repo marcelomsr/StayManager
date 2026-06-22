@@ -8,7 +8,7 @@ export function renderProfile() {
     <section class="panel profile-panel">
       <h2>${escapeHtml(state.user?.email)}</h2>
       <p>Empresa atual</p>
-      <select id="profile-company">${state.companies.map((company) => `<option value="${company.id}" ${state.company?.id === company.id ? 'selected' : ''}>${escapeHtml(company.name)}</option>`).join('')}</select>
+      <select id="profile-company">${state.companies.map((company) => `<option value="${company.id}" ${state.company?.id === company.id ? 'selected' : ''}>${escapeHtml(company.name)}${!company.active ? ' (inativo)' : ''}</option>`).join('')}</select>
       <p class="muted-text">A empresa selecionada fica salva nesta sessão até você alterar novamente.</p>
     </section>
   `);
