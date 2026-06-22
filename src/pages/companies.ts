@@ -2,6 +2,7 @@ import { escapeHtml, qs, toast } from '../components/dom';
 import { appShell, pageHeader } from '../components/layout';
 import { listCompaniesAdmin, saveCompany, softDelete } from '../services/repositories';
 import { Company } from '../types';
+import { state, emit } from '../state/app-state';
 
 let companies: Company[] = [];
 
@@ -25,10 +26,32 @@ export async function renderCompanies() {
 
 export function bindCompanies(refresh: () => void) {
   const form = qs<HTMLFormElement>('#company-form')!;
+  
   form.addEventListener('submit', async (event) => {
     event.preventDefault();
     const data = new FormData(form);
-    await saveCompany({ id: String(data.get('id') || '') || undefined, name: String(data.get('name')), active: data.has('active') });
+    const companyId = String(data.get('id') || '') || undefined;
+    const isActive = data.has('active');
+    
+    // Validar: não permitir desativar a empresa atual
+    // Apenas bloqueia se está tentando mudar de ativa para inativa
+    const company = companies.find((c) => c.id === companyId);
+    if (companyId && state.company?.id === companyId && company?.active && !isActive) {
+      toast('Você não pode desativar a empresa atual.', 'error');
+      return;
+    }
+    
+    const companyData = { id: companyId, name: String(data.get('name')), active: isActive };
+    await saveCompany(companyData);
+    
+    // Atualizar o estado com a empresa modificada
+    const updatedCompanies = await listCompaniesAdmin();
+    state.companies = updatedCompanies as Company[];
+    if (companyId && state.company?.id === companyId) {
+      state.company = state.companies.find((c) => c.id === companyId) ?? state.company;
+    }
+    emit();
+    
     toast('Empresa salva.');
     refresh();
   });
@@ -39,7 +62,23 @@ export function bindCompanies(refresh: () => void) {
     (form.elements.namedItem('active') as HTMLInputElement).checked = company.active;
   }));
   document.querySelectorAll<HTMLButtonElement>('[data-delete]').forEach((button) => button.addEventListener('click', async () => {
-    await softDelete('companies', button.dataset.delete!);
+    const deletedId = button.dataset.delete!;
+    
+    // Validar: não permitir excluir a empresa atual
+    if (state.company?.id === deletedId) {
+      toast('Você não pode excluir a empresa atual.', 'error');
+      return;
+    }
+    
+    await softDelete('companies', deletedId);
+    
+    // Atualizar o estado: remover empresa deletada da lista
+    state.companies = state.companies.filter((c) => c.id !== deletedId);
+    if (state.company?.id === deletedId) {
+      state.company = state.companies[0] ?? null;
+    }
+    emit();
+    
     refresh();
   }));
 }
