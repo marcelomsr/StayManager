@@ -2,7 +2,7 @@ import { PAYMENT_STATUS_OPTIONS, RESERVATION_STATUS_OPTIONS } from '../config';
 import { escapeHtml, qs, toast } from '../components/dom';
 import { appShell, pageHeader } from '../components/layout';
 import { listPlatforms, listStays, listStudios, saveStay, softDelete } from '../services/repositories';
-import { state } from '../state/app-state';
+import { state, isCompanyActive } from '../state/app-state';
 import { Platform, Stay, Studio } from '../types';
 import { calculateNights, isWithinNextDays, toDateInput, toDateTimeInput, weekday } from '../utils/date';
 import { brl, numberValue, optionalNumberValue } from '../utils/format';
@@ -128,6 +128,13 @@ export function bindHospedagens(refresh: () => void) {
   });
   form.addEventListener('submit', async (event) => {
     event.preventDefault();
+    
+    // Validar se a empresa está ativa
+    if (!isCompanyActive()) {
+      toast('Não é possível cadastrar em uma empresa inativa.', 'error');
+      return;
+    }
+    
     recalc();
     const data = new FormData(form);
     await saveStay(state.company!.id, {

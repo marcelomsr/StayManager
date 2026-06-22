@@ -2,7 +2,7 @@ import { CASH_DESCRIPTIONS } from '../config';
 import { escapeHtml, qs, toast } from '../components/dom';
 import { appShell, pageHeader } from '../components/layout';
 import { listCashEntries, saveCashEntry } from '../services/repositories';
-import { state } from '../state/app-state';
+import { state, isCompanyActive } from '../state/app-state';
 import { CashEntry, MonthRef } from '../types';
 import { addMonths, currentMonthRef, monthLabel } from '../utils/date';
 import { brl, numberValue } from '../utils/format';
@@ -44,6 +44,13 @@ export function bindCash(refresh: () => void) {
   qs<HTMLButtonElement>('#next-month')?.addEventListener('click', () => { ref = addMonths(ref, 1); refresh(); });
   qs<HTMLFormElement>('#cash-form')?.addEventListener('submit', async (event) => {
     event.preventDefault();
+    
+    // Validar se a empresa está ativa
+    if (!isCompanyActive()) {
+      toast('Não é possível cadastrar em uma empresa inativa.', 'error');
+      return;
+    }
+    
     const data = new FormData(event.currentTarget as HTMLFormElement);
     await saveCashEntry(state.company!.id, {
       kind: data.get('kind') as 'entrada' | 'saida',

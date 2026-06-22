@@ -1,7 +1,7 @@
 import { escapeHtml, qs, toast } from '../components/dom';
 import { appShell, pageHeader } from '../components/layout';
 import { listStudios, saveStudio, softDelete } from '../services/repositories';
-import { state } from '../state/app-state';
+import { state, isCompanyActive } from '../state/app-state';
 import { Studio } from '../types';
 
 let studios: Studio[] = [];
@@ -37,6 +37,13 @@ export function bindStudios(refresh: () => void) {
   const form = qs<HTMLFormElement>('#studio-form')!;
   form.addEventListener('submit', async (event) => {
     event.preventDefault();
+    
+    // Validar se a empresa está ativa
+    if (!isCompanyActive()) {
+      toast('Não é possível cadastrar em uma empresa inativa.', 'error');
+      return;
+    }
+    
     const data = new FormData(form);
     await saveStudio(state.company!.id, {
       id: String(data.get('id') || '') || undefined,

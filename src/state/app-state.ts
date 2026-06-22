@@ -113,3 +113,7 @@ export function setCompany(companyId: string) {
   if (company) sessionStorage.setItem('staymanager.company_id', company.id);
   emit();
 }
+
+export function isCompanyActive(): boolean {
+  return state.company?.active ?? false;
+}

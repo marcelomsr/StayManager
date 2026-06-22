@@ -1,7 +1,7 @@
 import { escapeHtml, qs, toast } from '../components/dom';
 import { appShell, pageHeader } from '../components/layout';
 import { listExpenseEntries, listExpenseTypes, listMonthStays, listStudios, saveExpenseEntry, saveExpenseType } from '../services/repositories';
-import { state } from '../state/app-state';
+import { state, isCompanyActive } from '../state/app-state';
 import { ExpenseEntry, ExpenseType, MonthRef, Studio } from '../types';
 import { addMonths, currentMonthRef, monthBounds, monthLabel, pad } from '../utils/date';
 import { brl, numberValue } from '../utils/format';
@@ -60,6 +60,13 @@ export function bindDespesas(refresh: () => void) {
   qs<HTMLButtonElement>('#next-month')?.addEventListener('click', () => { ref = addMonths(ref, 1); refresh(); });
   qs<HTMLFormElement>('#expense-type-form')?.addEventListener('submit', async (event) => {
     event.preventDefault();
+    
+    // Validar se a empresa está ativa
+    if (!isCompanyActive()) {
+      toast('Não é possível cadastrar em uma empresa inativa.', 'error');
+      return;
+    }
+    
     const form = event.currentTarget as HTMLFormElement;
     const data = new FormData(form);
     await saveExpenseType(state.company!.id, { id: String(data.get('id') || '') || undefined, name: String(data.get('name')), active: true }, data.getAll('studio_ids').map(String));
@@ -68,6 +75,13 @@ export function bindDespesas(refresh: () => void) {
   });
   qs<HTMLFormElement>('#expense-entry-form')?.addEventListener('submit', async (event) => {
     event.preventDefault();
+    
+    // Validar se a empresa está ativa
+    if (!isCompanyActive()) {
+      toast('Não é possível cadastrar em uma empresa inativa.', 'error');
+      return;
+    }
+    
     const form = event.currentTarget as HTMLFormElement;
     const data = new FormData(form);
     await saveExpenseEntry(state.company!.id, {

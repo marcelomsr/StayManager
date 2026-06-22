@@ -1,7 +1,7 @@
 import { escapeHtml, qs, toast } from '../components/dom';
 import { appShell, pageHeader } from '../components/layout';
 import { listNotes, saveNote, softDelete } from '../services/repositories';
-import { state } from '../state/app-state';
+import { state, isCompanyActive } from '../state/app-state';
 import { Note } from '../types';
 
 let notes: Note[] = [];
@@ -29,6 +29,13 @@ export function bindNotes(refresh: () => void) {
   const form = qs<HTMLFormElement>('#note-form')!;
   form.addEventListener('submit', async (event) => {
     event.preventDefault();
+    
+    // Validar se a empresa está ativa
+    if (!isCompanyActive()) {
+      toast('Não é possível cadastrar em uma empresa inativa.', 'error');
+      return;
+    }
+    
     const data = new FormData(form);
     await saveNote(state.company!.id, { id: String(data.get('id') || '') || undefined, title: String(data.get('title')), body: String(data.get('body')), active: true });
     toast('Anotação salva.');
