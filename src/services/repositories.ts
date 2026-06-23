@@ -130,9 +130,51 @@ export async function listExpenseEntries(companyId: Id, year: number, month: num
 }
 
 export async function saveExpenseEntry(companyId: Id, values: Partial<ExpenseEntry>) {
-  const payload = { ...values, company_id: companyId };
-  const { error } = values.id ? await supabase.from('expense_entries').update(payload).eq('id', values.id) : await supabase.from('expense_entries').insert(payload);
+  const payload = { ...values, company_id: companyRequired(companyId) };
+  const referenceMonth = String(payload.reference_month || '');
+  const studioId = String(payload.studio_id || '');
+  const expenseTypeId = String(payload.expense_type_id || '');
+
+  if (!referenceMonth || !studioId || !expenseTypeId) {
+    throw new Error('Os campos studio, tipo e mês são obrigatórios.');
+  }
+
+  const duplicateQuery = supabase
+    .from('expense_entries')
+    .select('id', { count: 'exact', head: true })
+    .eq('company_id', companyId)
+    .eq('studio_id', studioId)
+    .eq('expense_type_id', expenseTypeId)
+    .eq('reference_month', referenceMonth);
+
+  if (values.id) {
+    duplicateQuery.neq('id', values.id);
+  }
+
+  const { count, error: countError } = await duplicateQuery;
+  if (countError) throw countError;
+  if ((count ?? 0) > 0) {
+    throw new Error('Já existe uma despesa deste tipo para o mesmo studio e mês.');
+  }
+
+  const { error } = values.id
+    ? await supabase.from('expense_entries').update(payload).eq('id', values.id)
+    : await supabase.from('expense_entries').insert(payload);
   if (error) throw error;
+}
+
+export async function deleteExpenseEntry(companyId: Id, expenseEntryId: Id) {
+  companyRequired(companyId);
+  const { data, error } = await supabase
+    .from('expense_entries')
+    .delete()
+    .eq('company_id', companyId)
+    .eq('id', expenseEntryId)
+    .select('id')
+    .single();
+
+  if (error) throw error;
+  if (!data?.id) throw new Error('Despesa não encontrada.');
 }
 
 export async function listCashEntries(companyId: Id, year?: number, month?: number) {

@@ -1,6 +1,6 @@
 import { escapeHtml, qs, toast } from '../components/dom';
 import { appShell, pageHeader } from '../components/layout';
-import { listExpenseEntries, listExpenseTypes, listMonthStays, listStudios, saveExpenseEntry, saveExpenseType } from '../services/repositories';
+import { listExpenseEntries, listExpenseTypes, listMonthStays, listStudios, saveExpenseEntry, saveExpenseType, deleteExpenseEntry } from '../services/repositories';
 import { state, isCompanyActive } from '../state/app-state';
 import { ExpenseEntry, ExpenseType, Id, MonthRef, Studio } from '../types';
 import { addMonths, currentMonthRef, monthBounds, monthLabel, pad } from '../utils/date';
@@ -50,16 +50,17 @@ export async function renderDespesas() {
       </form>
       <form id="expense-entry-form" class="panel form-grid">
         <h2>Lançamento mensal</h2>
+        <input type="hidden" name="id" />
         <label>Studio <select id="expense-entry-studio" name="studio_id">${studios.map((studio) => `<option value="${studio.id}">${escapeHtml(studio.name)}</option>`).join('')}</select></label>
         <label>Tipo <select id="expense-entry-type" name="expense_type_id">${renderExpenseTypeOptions(defaultStudioId)}</select></label>
         <label>Valor <input name="amount" inputmode="decimal" required /></label>
         <label>Observação <textarea name="notes"></textarea></label>
-        <button class="primary">Lançar gasto</button>
+        <button id="expense-entry-submit" class="primary">Lançar gasto</button>
       </form>
     </section>
     <section class="panel table-wrap">
-      <table><thead><tr><th>Studio</th><th>Tipo</th><th>Valor</th><th>Observação</th></tr></thead>
-      <tbody>${entries.map((entry) => `<tr><td>${escapeHtml(entry.studios?.name)}</td><td>${escapeHtml(entry.expense_types?.name)}</td><td>${brl(entry.amount)}</td><td>${escapeHtml(entry.notes)}</td></tr>`).join('')}</tbody></table>
+      <table><thead><tr><th>Studio</th><th>Tipo</th><th>Valor</th><th>Observação</th><th></th></tr></thead>
+      <tbody>${entries.map((entry) => `<tr><td>${escapeHtml(entry.studios?.name)}</td><td>${escapeHtml(entry.expense_types?.name)}</td><td>${brl(entry.amount)}</td><td>${escapeHtml(entry.notes)}</td><td class="row-actions"><button data-edit="${entry.id}">Editar</button><button class="danger" data-delete="${entry.id}">Excluir</button></td></tr>`).join('')}</tbody></table>
     </section>
   `);
 }
@@ -67,8 +68,10 @@ export async function renderDespesas() {
 export function bindDespesas(refresh: () => void) {
   qs<HTMLButtonElement>('#prev-month')?.addEventListener('click', () => { ref = addMonths(ref, -1); refresh(); });
   qs<HTMLButtonElement>('#next-month')?.addEventListener('click', () => { ref = addMonths(ref, 1); refresh(); });
+  const form = qs<HTMLFormElement>('#expense-entry-form')!;
   const studioSelect = qs<HTMLSelectElement>('#expense-entry-studio');
   const expenseTypeSelect = qs<HTMLSelectElement>('#expense-entry-type');
+  const submitButton = qs<HTMLButtonElement>('#expense-entry-submit');
 
   const syncExpenseTypeOptions = (studioId: Id) => {
     if (!expenseTypeSelect) return;
@@ -100,7 +103,8 @@ export function bindDespesas(refresh: () => void) {
     toast('Tipo de gasto salvo.');
     refresh();
   });
-  qs<HTMLFormElement>('#expense-entry-form')?.addEventListener('submit', async (event) => {
+
+  form.addEventListener('submit', async (event) => {
     event.preventDefault();
     
     // Validar se a empresa está ativa
@@ -109,7 +113,6 @@ export function bindDespesas(refresh: () => void) {
       return;
     }
     
-    const form = event.currentTarget as HTMLFormElement;
     const data = new FormData(form);
     const studioId = String(data.get('studio_id'));
     const expenseTypeId = String(data.get('expense_type_id'));
@@ -119,14 +122,43 @@ export function bindDespesas(refresh: () => void) {
       return;
     }
 
-    await saveExpenseEntry(state.company!.id, {
-      studio_id: studioId,
-      expense_type_id: expenseTypeId,
-      reference_month: `${ref.year}-${pad(ref.month)}-01`,
-      amount: numberValue(data.get('amount')),
-      notes: String(data.get('notes') || '') || null
-    });
-    toast('Despesa lançada.');
-    refresh();
+    try {
+      await saveExpenseEntry(state.company!.id, {
+        id: String(data.get('id') || '') || undefined,
+        studio_id: studioId,
+        expense_type_id: expenseTypeId,
+        reference_month: `${ref.year}-${pad(ref.month)}-01`,
+        amount: numberValue(data.get('amount')),
+        notes: String(data.get('notes') || '') || null
+      });
+
+      toast(data.get('id') ? 'Despesa atualizada.' : 'Despesa lançada.');
+      refresh();
+    } catch (error) {
+      toast(error instanceof Error ? error.message : 'Erro ao salvar despesa.', 'error');
+    }
   });
+
+  document.querySelectorAll<HTMLButtonElement>('[data-edit]').forEach((button) => button.addEventListener('click', () => {
+    const entry = entries.find((item) => item.id === button.dataset.edit)!;
+    if (!entry) return;
+
+    (form.elements.namedItem('id') as HTMLInputElement).value = entry.id;
+    studioSelect!.value = entry.studio_id;
+    syncExpenseTypeOptions(entry.studio_id);
+    expenseTypeSelect!.value = entry.expense_type_id;
+    (form.elements.namedItem('amount') as HTMLInputElement).value = String(entry.amount);
+    (form.elements.namedItem('notes') as HTMLTextAreaElement).value = entry.notes ?? '';
+    submitButton!.textContent = 'Salvar alteração';
+  }));
+
+  document.querySelectorAll<HTMLButtonElement>('[data-delete]').forEach((button) => button.addEventListener('click', async () => {
+    try {
+      await deleteExpenseEntry(state.company!.id, button.dataset.delete!);
+      toast('Despesa excluída.');
+      refresh();
+    } catch (error) {
+      toast(error instanceof Error ? error.message : 'Erro ao excluir despesa.', 'error');
+    }
+  }));
 }

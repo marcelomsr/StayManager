@@ -127,6 +127,9 @@ create table if not exists public.expense_entries (
   updated_at timestamptz not null default now()
 );
 
+create unique index if not exists expense_entries_unique_by_studio_type_month
+  on public.expense_entries(company_id, studio_id, expense_type_id, reference_month);
+
 create or replace function public.validate_expense_entry_type_studio()
 returns trigger
 language plpgsql
@@ -346,6 +349,7 @@ create policy "anon_delete_expense_type_studios" on public.expense_type_studios 
 create policy "anon_select_expense_entries" on public.expense_entries for select to anon using (true);
 create policy "anon_insert_expense_entries" on public.expense_entries for insert to anon with check (true);
 create policy "anon_update_expense_entries" on public.expense_entries for update to anon using (true) with check (true);
+create policy "anon_delete_expense_entries" on public.expense_entries for delete to anon using (true);
 
 create policy "anon_select_cash_entries" on public.cash_entries for select to anon using (true);
 create policy "anon_insert_cash_entries" on public.cash_entries for insert to anon with check (true);
