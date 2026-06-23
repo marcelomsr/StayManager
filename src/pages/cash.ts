@@ -1,11 +1,18 @@
 import { CASH_DESCRIPTIONS } from '../config';
 import { escapeHtml, qs, toast } from '../components/dom';
 import { appShell, pageHeader } from '../components/layout';
-import { listCashEntries, saveCashEntry } from '../services/repositories';
+import { listCashEntries, saveCashEntry, deleteCashEntry } from '../services/repositories';
 import { state, isCompanyActive } from '../state/app-state';
 import { CashEntry, MonthRef } from '../types';
 import { addMonths, currentMonthRef, monthLabel } from '../utils/date';
 import { brl, numberValue } from '../utils/format';
+
+const formatDate = (value: string) => {
+  if (!value) return '';
+  const datePart = value.split('T')[0];
+  const [year, month, day] = datePart.split('-');
+  return `${day}/${month}/${year}`;
+};
 
 let ref: MonthRef = currentMonthRef();
 let entries: CashEntry[] = [];
@@ -24,16 +31,17 @@ export async function renderCash() {
     </section>
     <section class="split">
       <form id="cash-form" class="panel form-grid">
+        <input type="hidden" name="id" />
         <label>Tipo <select name="kind"><option value="entrada">Entrada</option><option value="saida">Saída</option></select></label>
         <label>Data <input type="date" name="entry_date" required /></label>
         <label>Descrição <input name="description" list="cash-descriptions" required /></label>
         <datalist id="cash-descriptions">${CASH_DESCRIPTIONS.map((item) => `<option value="${escapeHtml(item)}"></option>`).join('')}</datalist>
         <label>Valor <input name="amount" inputmode="decimal" required /></label>
-        <button class="primary">Salvar</button>
+        <button id="cash-submit" class="primary">Salvar</button>
       </form>
       <section class="panel table-wrap">
-        <table><thead><tr><th>Data</th><th>Tipo</th><th>Descrição</th><th>Valor</th></tr></thead>
-        <tbody>${entries.map((entry) => `<tr><td>${new Date(entry.entry_date).toLocaleDateString('pt-BR')}</td><td>${entry.kind}</td><td>${escapeHtml(entry.description)}</td><td>${brl(entry.amount)}</td></tr>`).join('')}</tbody></table>
+        <table><thead><tr><th>Data</th><th>Tipo</th><th>Descrição</th><th>Valor</th><th></th></tr></thead>
+        <tbody>${entries.map((entry) => `<tr><td>${formatDate(entry.entry_date)}</td><td>${entry.kind}</td><td>${escapeHtml(entry.description)}</td><td>${brl(entry.amount)}</td><td class="row-actions"><button data-edit="${entry.id}">Editar</button><button class="danger" data-delete="${entry.id}">Excluir</button></td></tr>`).join('')}</tbody></table>
       </section>
     </section>
   `);
@@ -42,6 +50,9 @@ export async function renderCash() {
 export function bindCash(refresh: () => void) {
   qs<HTMLButtonElement>('#prev-month')?.addEventListener('click', () => { ref = addMonths(ref, -1); refresh(); });
   qs<HTMLButtonElement>('#next-month')?.addEventListener('click', () => { ref = addMonths(ref, 1); refresh(); });
+  const form = qs<HTMLFormElement>('#cash-form')!;
+  const submitButton = qs<HTMLButtonElement>('#cash-submit');
+
   qs<HTMLFormElement>('#cash-form')?.addEventListener('submit', async (event) => {
     event.preventDefault();
     
@@ -53,12 +64,40 @@ export function bindCash(refresh: () => void) {
     
     const data = new FormData(event.currentTarget as HTMLFormElement);
     await saveCashEntry(state.company!.id, {
+      id: String(data.get('id') || '') || undefined,
       kind: data.get('kind') as 'entrada' | 'saida',
       entry_date: String(data.get('entry_date')),
       description: String(data.get('description')),
       amount: numberValue(data.get('amount'))
     });
-    toast('Lançamento salvo.');
+    toast(data.get('id') ? 'Lançamento atualizado.' : 'Lançamento salvo.');
     refresh();
+  });
+
+  document.querySelectorAll<HTMLButtonElement>('[data-edit]').forEach((button) => {
+    button.addEventListener('click', () => {
+      const entry = entries.find((item) => item.id === button.dataset.edit);
+      if (!entry) return;
+      const entryDate = entry.entry_date.split('T')[0];
+      (form.elements.namedItem('id') as HTMLInputElement).value = entry.id;
+      (form.elements.namedItem('kind') as HTMLSelectElement).value = entry.kind;
+      (form.elements.namedItem('entry_date') as HTMLInputElement).value = entryDate;
+      (form.elements.namedItem('description') as HTMLInputElement).value = entry.description;
+      (form.elements.namedItem('amount') as HTMLInputElement).value = String(entry.amount);
+      if (submitButton) submitButton.textContent = 'Salvar alteração';
+    });
+  });
+
+  document.querySelectorAll<HTMLButtonElement>('[data-delete]').forEach((button) => {
+    button.addEventListener('click', async () => {
+      if (!button.dataset.delete) return;
+      try {
+        await deleteCashEntry(state.company!.id, button.dataset.delete);
+        toast('Lançamento excluído.');
+        refresh();
+      } catch (error) {
+        toast(error instanceof Error ? error.message : 'Erro ao excluir lançamento.', 'error');
+      }
+    });
   });
 }

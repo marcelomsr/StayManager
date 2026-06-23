@@ -204,6 +204,19 @@ export async function saveCashEntry(companyId: Id, values: Partial<CashEntry>) {
   if (error) throw error;
 }
 
+export async function deleteCashEntry(companyId: Id, cashEntryId: Id) {
+  const { data, error } = await supabase
+    .from('cash_entries')
+    .delete()
+    .eq('company_id', companyId)
+    .eq('id', cashEntryId)
+    .select('id')
+    .single();
+
+  if (error) throw error;
+  if (!data?.id) throw new Error('Lançamento não encontrado.');
+}
+
 export async function listNotes(companyId: Id) {
   const { data, error } = await supabase.from('notes').select('*').eq('company_id', companyId).is('deleted_at', null).order('updated_at', { ascending: false });
   if (error) throw error;
