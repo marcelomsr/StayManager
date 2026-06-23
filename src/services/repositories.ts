@@ -58,9 +58,9 @@ export async function listStays(companyId: Id, filters: Record<string, string> =
   return data as Stay[];
 }
 
-export async function listMonthStays(companyId: Id, year: number, month: number) {
+export async function listMonthStays(companyId: Id, year: number, month: number, studioId?: Id) {
   const { start, end } = monthBounds({ year, month });
-  const { data, error } = await supabase
+  let query = supabase
     .from('stays')
     .select('*,studios(*),platforms(*)')
     .eq('company_id', companyId)
@@ -68,6 +68,10 @@ export async function listMonthStays(companyId: Id, year: number, month: number)
     .lt('check_in_at', `${end}T23:59:59`)
     .gt('check_out_at', `${start}T00:00:00`)
     .order('check_in_at');
+
+  if (studioId) query = query.eq('studio_id', studioId);
+
+  const { data, error } = await query;
   if (error) throw error;
   return data as Stay[];
 }
@@ -119,14 +123,18 @@ export async function saveExpenseType(companyId: Id, values: Partial<ExpenseType
   if (linkError) throw linkError;
 }
 
-export async function listExpenseEntries(companyId: Id, year: number, month: number) {
+export async function listExpenseEntries(companyId: Id, year: number, month: number, studioId?: Id) {
   const reference = `${year}-${pad(month)}-01`;
-  const { data, error } = await supabase
+  let query = supabase
     .from('expense_entries')
     .select('*,expense_types(*),studios(*)')
     .eq('company_id', companyId)
     .eq('reference_month', reference)
     .order('created_at', { ascending: false });
+
+  if (studioId) query = query.eq('studio_id', studioId);
+
+  const { data, error } = await query;
   if (error) throw error;
   return data as ExpenseEntry[];
 }

@@ -2,11 +2,12 @@ import { escapeHtml, qs, toast } from '../components/dom';
 import { appShell, pageHeader } from '../components/layout';
 import { listExpenseEntries, listExpenseTypes, listMonthStays, listStudios, saveExpenseEntry, saveExpenseType, deleteExpenseEntry } from '../services/repositories';
 import { state, isCompanyActive } from '../state/app-state';
-import { ExpenseEntry, ExpenseType, Id, MonthRef, Studio } from '../types';
+import { ExpenseEntry, ExpenseType, Id, MonthRef, Studio, Stay } from '../types';
 import { addMonths, currentMonthRef, monthBounds, monthLabel, pad } from '../utils/date';
 import { brl, numberValue } from '../utils/format';
 
 let ref: MonthRef = currentMonthRef();
+let selectedStudioId: Id = '';
 let entries: ExpenseEntry[] = [];
 let types: ExpenseType[] = [];
 let studios: Studio[] = [];
@@ -18,6 +19,30 @@ const renderExpenseTypeOptions = (studioId: Id) =>
   filterTypesByStudio(studioId)
     .map((type) => `<option value="${type.id}">${escapeHtml(type.name)}</option>`)
     .join('');
+
+const toDateOnly = (value: string) => {
+  const date = new Date(value);
+  return new Date(Date.UTC(date.getFullYear(), date.getMonth(), date.getDate()));
+};
+
+const calculateNightsBetween = (start: Date, end: Date) => {
+  const startUtc = Date.UTC(start.getUTCFullYear(), start.getUTCMonth(), start.getUTCDate());
+  const endUtc = Date.UTC(end.getUTCFullYear(), end.getUTCMonth(), end.getUTCDate());
+  return Math.max(0, Math.floor((endUtc - startUtc) / 86_400_000));
+};
+
+const proratedNetAmountForMonth = (stay: Stay, ref: MonthRef) => {
+  const totalNights = calculateNightsBetween(toDateOnly(stay.check_in_at), toDateOnly(stay.check_out_at));
+  if (!totalNights || !stay.net_amount) return 0;
+
+  const monthStart = new Date(Date.UTC(ref.year, ref.month - 1, 1));
+  const monthEndExclusive = new Date(Date.UTC(ref.year, ref.month, 1));
+  const overlapStart = new Date(Math.max(toDateOnly(stay.check_in_at).getTime(), monthStart.getTime()));
+  const overlapEnd = new Date(Math.min(toDateOnly(stay.check_out_at).getTime(), monthEndExclusive.getTime()));
+  const overlapNights = calculateNightsBetween(overlapStart, overlapEnd);
+
+  return (stay.net_amount * overlapNights) / totalNights;
+};
 
 const EXPENSE_PAYMENT_STATUS_OPTIONS = [
   { name: 'Não pago', color: '#ff8f8f' },
@@ -33,13 +58,13 @@ const badge = (label: string) => {
 export async function renderDespesas() {
   if (!state.company) return appShell('');
   [entries, types, studios] = await Promise.all([
-    listExpenseEntries(state.company.id, ref.year, ref.month),
+    listExpenseEntries(state.company.id, ref.year, ref.month, selectedStudioId),
     listExpenseTypes(state.company.id),
     listStudios(state.company.id)
   ]);
-  const stays = await listMonthStays(state.company.id, ref.year, ref.month);
+  const stays = await listMonthStays(state.company.id, ref.year, ref.month, selectedStudioId);
   const totalExpenses = entries.reduce((sum, entry) => sum + Number(entry.amount), 0);
-  const revenue = stays.reduce((sum, stay) => sum + Number(stay.net_amount ?? 0), 0);
+  const revenue = stays.reduce((sum, stay) => sum + proratedNetAmountForMonth(stay, ref), 0);
   const days = monthBounds(ref).days;
   const dailyGoal = totalExpenses / days;
   const defaultStudioId = studios[0]?.id ?? '';
@@ -47,6 +72,15 @@ export async function renderDespesas() {
   return appShell(`
     ${pageHeader('Despesas', `<div class="month-nav"><button id="prev-month" class="ghost">Anterior</button><strong>${monthLabel(ref)}</strong><button id="next-month" class="ghost">Próximo</button></div>`)}
     <section class="cards-grid">
+      <article class="metric-card">
+        <span>Studio</span>
+        <strong>
+          <select id="expense-studio-filter">
+            <option value="">Todos</option>
+            ${studios.map((studio) => `<option value="${studio.id}" ${studio.id === selectedStudioId ? 'selected' : ''}>${escapeHtml(studio.name)}</option>`).join('')}
+          </select>
+        </strong>
+      </article>
       <article class="metric-card"><span>Gastos do mês</span><strong>${brl(totalExpenses)}</strong></article>
       <article class="metric-card"><span>Faturamento líquido rateado</span><strong>${brl(revenue)}</strong></article>
       <article class="metric-card"><span>Média para se pagar</span><strong>${brl(dailyGoal)}</strong></article>
@@ -84,6 +118,7 @@ export function bindDespesas(refresh: () => void) {
   const studioSelect = qs<HTMLSelectElement>('#expense-entry-studio');
   const expenseTypeSelect = qs<HTMLSelectElement>('#expense-entry-type');
   const submitButton = qs<HTMLButtonElement>('#expense-entry-submit');
+  const studioFilter = qs<HTMLSelectElement>('#expense-studio-filter');
 
   const syncExpenseTypeOptions = (studioId: Id) => {
     if (!expenseTypeSelect) return;
@@ -96,6 +131,11 @@ export function bindDespesas(refresh: () => void) {
 
   studioSelect?.addEventListener('change', () => {
     syncExpenseTypeOptions(studioSelect.value);
+  });
+
+  studioFilter?.addEventListener('change', () => {
+    selectedStudioId = studioFilter.value;
+    refresh();
   });
 
   syncExpenseTypeOptions(studioSelect?.value ?? '');
