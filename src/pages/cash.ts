@@ -14,6 +14,10 @@ const formatDate = (value: string) => {
   return `${day}/${month}/${year}`;
 };
 
+const capitalizeKind = (kind: string) => {
+  return kind.charAt(0).toUpperCase() + kind.slice(1);
+};
+
 let ref: MonthRef = currentMonthRef();
 let entries: CashEntry[] = [];
 
@@ -41,7 +45,7 @@ export async function renderCash() {
       </form>
       <section class="panel table-wrap">
         <table><thead><tr><th>Data</th><th>Tipo</th><th>Descrição</th><th>Valor</th><th></th></tr></thead>
-        <tbody>${entries.map((entry) => `<tr><td>${formatDate(entry.entry_date)}</td><td>${entry.kind}</td><td>${escapeHtml(entry.description)}</td><td>${brl(entry.amount)}</td><td class="row-actions"><button data-edit="${entry.id}">Editar</button><button class="danger" data-delete="${entry.id}">Excluir</button></td></tr>`).join('')}</tbody></table>
+        <tbody>${entries.map((entry) => `<tr><td>${formatDate(entry.entry_date)}</td><td>${capitalizeKind(entry.kind)}</td><td>${escapeHtml(entry.description)}</td><td>${brl(entry.amount)}</td><td class="row-actions"><button data-edit="${entry.id}">Editar</button><button class="danger" data-delete="${entry.id}">Excluir</button></td></tr>`).join('')}</tbody></table>
       </section>
     </section>
   `);
