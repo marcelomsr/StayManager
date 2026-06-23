@@ -2,7 +2,7 @@ import { escapeHtml, qs, toast } from '../components/dom';
 import { appShell, pageHeader } from '../components/layout';
 import { listExpenseEntries, listExpenseTypes, listMonthStays, listStudios, saveExpenseEntry, saveExpenseType } from '../services/repositories';
 import { state, isCompanyActive } from '../state/app-state';
-import { ExpenseEntry, ExpenseType, MonthRef, Studio } from '../types';
+import { ExpenseEntry, ExpenseType, Id, MonthRef, Studio } from '../types';
 import { addMonths, currentMonthRef, monthBounds, monthLabel, pad } from '../utils/date';
 import { brl, numberValue } from '../utils/format';
 
@@ -10,6 +10,14 @@ let ref: MonthRef = currentMonthRef();
 let entries: ExpenseEntry[] = [];
 let types: ExpenseType[] = [];
 let studios: Studio[] = [];
+
+const filterTypesByStudio = (studioId: Id) =>
+  types.filter((type) => type.studio_ids?.includes(studioId));
+
+const renderExpenseTypeOptions = (studioId: Id) =>
+  filterTypesByStudio(studioId)
+    .map((type) => `<option value="${type.id}">${escapeHtml(type.name)}</option>`)
+    .join('');
 
 export async function renderDespesas() {
   if (!state.company) return appShell('');
@@ -23,6 +31,7 @@ export async function renderDespesas() {
   const revenue = stays.reduce((sum, stay) => sum + Number(stay.net_amount ?? 0), 0);
   const days = monthBounds(ref).days;
   const dailyGoal = totalExpenses / days;
+  const defaultStudioId = studios[0]?.id ?? '';
 
   return appShell(`
     ${pageHeader('Despesas', `<div class="month-nav"><button id="prev-month" class="ghost">Anterior</button><strong>${monthLabel(ref)}</strong><button id="next-month" class="ghost">Próximo</button></div>`)}
@@ -41,8 +50,8 @@ export async function renderDespesas() {
       </form>
       <form id="expense-entry-form" class="panel form-grid">
         <h2>Lançamento mensal</h2>
-        <label>Studio <select name="studio_id">${studios.map((studio) => `<option value="${studio.id}">${escapeHtml(studio.name)}</option>`).join('')}</select></label>
-        <label>Tipo <select name="expense_type_id">${types.map((type) => `<option value="${type.id}">${escapeHtml(type.name)}</option>`).join('')}</select></label>
+        <label>Studio <select id="expense-entry-studio" name="studio_id">${studios.map((studio) => `<option value="${studio.id}">${escapeHtml(studio.name)}</option>`).join('')}</select></label>
+        <label>Tipo <select id="expense-entry-type" name="expense_type_id">${renderExpenseTypeOptions(defaultStudioId)}</select></label>
         <label>Valor <input name="amount" inputmode="decimal" required /></label>
         <label>Observação <textarea name="notes"></textarea></label>
         <button class="primary">Lançar gasto</button>
@@ -58,6 +67,24 @@ export async function renderDespesas() {
 export function bindDespesas(refresh: () => void) {
   qs<HTMLButtonElement>('#prev-month')?.addEventListener('click', () => { ref = addMonths(ref, -1); refresh(); });
   qs<HTMLButtonElement>('#next-month')?.addEventListener('click', () => { ref = addMonths(ref, 1); refresh(); });
+  const studioSelect = qs<HTMLSelectElement>('#expense-entry-studio');
+  const expenseTypeSelect = qs<HTMLSelectElement>('#expense-entry-type');
+
+  const syncExpenseTypeOptions = (studioId: Id) => {
+    if (!expenseTypeSelect) return;
+    const currentValue = expenseTypeSelect.value;
+    expenseTypeSelect.innerHTML = renderExpenseTypeOptions(studioId);
+    if (currentValue && Array.from(expenseTypeSelect.options).some((option) => option.value === currentValue)) {
+      expenseTypeSelect.value = currentValue;
+    }
+  };
+
+  studioSelect?.addEventListener('change', () => {
+    syncExpenseTypeOptions(studioSelect.value);
+  });
+
+  syncExpenseTypeOptions(studioSelect?.value ?? '');
+
   qs<HTMLFormElement>('#expense-type-form')?.addEventListener('submit', async (event) => {
     event.preventDefault();
     
@@ -84,9 +111,17 @@ export function bindDespesas(refresh: () => void) {
     
     const form = event.currentTarget as HTMLFormElement;
     const data = new FormData(form);
+    const studioId = String(data.get('studio_id'));
+    const expenseTypeId = String(data.get('expense_type_id'));
+    const validTypes = filterTypesByStudio(studioId).map((type) => type.id);
+    if (!validTypes.includes(expenseTypeId)) {
+      toast('Tipo de gasto inválido para o studio selecionado.', 'error');
+      return;
+    }
+
     await saveExpenseEntry(state.company!.id, {
-      studio_id: String(data.get('studio_id')),
-      expense_type_id: String(data.get('expense_type_id')),
+      studio_id: studioId,
+      expense_type_id: expenseTypeId,
       reference_month: `${ref.year}-${pad(ref.month)}-01`,
       amount: numberValue(data.get('amount')),
       notes: String(data.get('notes') || '') || null

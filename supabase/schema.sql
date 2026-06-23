@@ -127,6 +127,28 @@ create table if not exists public.expense_entries (
   updated_at timestamptz not null default now()
 );
 
+create or replace function public.validate_expense_entry_type_studio()
+returns trigger
+language plpgsql
+as $$
+begin
+  if not exists (
+    select 1
+    from public.expense_type_studios ets
+    where ets.expense_type_id = new.expense_type_id
+      and ets.studio_id = new.studio_id
+  ) then
+    raise exception 'O tipo de despesa não está associado ao studio selecionado.';
+  end if;
+  return new;
+end;
+$$;
+
+drop trigger if exists validate_expense_entry_type_studio on public.expense_entries;
+create trigger validate_expense_entry_type_studio
+before insert or update on public.expense_entries
+for each row execute function public.validate_expense_entry_type_studio();
+
 create table if not exists public.cash_entries (
   id uuid primary key default gen_random_uuid(),
   company_id uuid not null references public.companies(id) on delete cascade,
