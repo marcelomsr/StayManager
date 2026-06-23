@@ -59,11 +59,16 @@ export async function renderHospedagens() {
 
 function stayForm(stay?: Stay) {
   const studio = studios.find((item) => item.id === stay?.studio_id);
+  const activeStudios = studios.filter((item) => item.active);
+  const studioOptions = stay
+    ? [...activeStudios, ...(studio && !studio.active ? [studio] : [])]
+    : activeStudios;
+
   return `
     <form id="stay-form" class="panel form-grid">
       <h2>${stay ? 'Editar hospedagem' : 'Nova hospedagem'}</h2>
       <input type="hidden" name="id" value="${stay?.id ?? ''}" />
-      <label>Studio <select name="studio_id" required>${studios.map((item) => `<option value="${item.id}" ${stay?.studio_id === item.id ? 'selected' : ''}>${escapeHtml(item.name)}</option>`).join('')}</select></label>
+      <label>Studio <select name="studio_id" required>${studioOptions.map((item) => `<option value="${item.id}" ${stay?.studio_id === item.id ? 'selected' : ''}>${escapeHtml(item.name)}${!item.active ? ' (inativo)' : ''}</option>`).join('')}</select></label>
       <label>Entrada <input type="datetime-local" name="check_in_at" value="${toDateTimeInput(stay?.check_in_at)}" required /></label>
       <label>Saída <input type="datetime-local" name="check_out_at" value="${toDateTimeInput(stay?.check_out_at)}" required /></label>
       <label>Hóspedes <textarea name="guests_names" required>${escapeHtml(stay?.guests_names)}</textarea></label>
