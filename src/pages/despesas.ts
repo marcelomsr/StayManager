@@ -19,6 +19,17 @@ const renderExpenseTypeOptions = (studioId: Id) =>
     .map((type) => `<option value="${type.id}">${escapeHtml(type.name)}</option>`)
     .join('');
 
+const EXPENSE_PAYMENT_STATUS_OPTIONS = [
+  { name: 'Não pago', color: '#ff8f8f' },
+  { name: 'Pago', color: '#8ec5ff' }
+] as const;
+
+const badge = (label: string) => {
+  const option = EXPENSE_PAYMENT_STATUS_OPTIONS.find((item) => item.name === label);
+  const color = option?.color ?? '#d8dde8';
+  return `<span class="badge" style="--badge:${color}">${escapeHtml(label)}</span>`;
+};
+
 export async function renderDespesas() {
   if (!state.company) return appShell('');
   [entries, types, studios] = await Promise.all([
@@ -53,14 +64,15 @@ export async function renderDespesas() {
         <input type="hidden" name="id" />
         <label>Studio <select id="expense-entry-studio" name="studio_id">${studios.map((studio) => `<option value="${studio.id}">${escapeHtml(studio.name)}</option>`).join('')}</select></label>
         <label>Tipo <select id="expense-entry-type" name="expense_type_id">${renderExpenseTypeOptions(defaultStudioId)}</select></label>
+        <label>Pagamento <select name="payment_status">${EXPENSE_PAYMENT_STATUS_OPTIONS.map((item) => `<option value="${item.name}">${item.name}</option>`).join('')}</select></label>
         <label>Valor <input name="amount" inputmode="decimal" required /></label>
         <label>Observação <textarea name="notes"></textarea></label>
         <button id="expense-entry-submit" class="primary">Lançar gasto</button>
       </form>
     </section>
     <section class="panel table-wrap">
-      <table><thead><tr><th>Studio</th><th>Tipo</th><th>Valor</th><th>Observação</th><th></th></tr></thead>
-      <tbody>${entries.map((entry) => `<tr><td>${escapeHtml(entry.studios?.name)}</td><td>${escapeHtml(entry.expense_types?.name)}</td><td>${brl(entry.amount)}</td><td>${escapeHtml(entry.notes)}</td><td class="row-actions"><button data-edit="${entry.id}">Editar</button><button class="danger" data-delete="${entry.id}">Excluir</button></td></tr>`).join('')}</tbody></table>
+      <table><thead><tr><th>Studio</th><th>Tipo</th><th>Pagamento</th><th>Valor</th><th>Observação</th><th></th></tr></thead>
+      <tbody>${entries.map((entry) => `<tr class="${entry.payment_status === 'Pago' ? 'paid' : 'unpaid'}"><td>${escapeHtml(entry.studios?.name)}</td><td>${escapeHtml(entry.expense_types?.name)}</td><td>${badge(entry.payment_status)}</td><td>${brl(entry.amount)}</td><td>${escapeHtml(entry.notes)}</td><td class="row-actions"><button data-edit="${entry.id}">Editar</button><button class="danger" data-delete="${entry.id}">Excluir</button></td></tr>`).join('')}</tbody></table>
     </section>
   `);
 }
@@ -99,7 +111,16 @@ export function bindDespesas(refresh: () => void) {
     
     const form = event.currentTarget as HTMLFormElement;
     const data = new FormData(form);
-    await saveExpenseType(state.company!.id, { id: String(data.get('id') || '') || undefined, name: String(data.get('name')), active: true }, data.getAll('studio_ids').map(String));
+    const studioIds = data.getAll('studio_ids').map(String).filter(Boolean);
+    if (!studioIds.length) {
+      toast('Selecione ao menos um studio para o tipo de gasto.', 'error');
+      return;
+    }
+    await saveExpenseType(
+      state.company!.id,
+      { id: String(data.get('id') || '') || undefined, name: String(data.get('name')), active: true },
+      studioIds
+    );
     toast('Tipo de gasto salvo.');
     refresh();
   });
@@ -127,6 +148,7 @@ export function bindDespesas(refresh: () => void) {
         id: String(data.get('id') || '') || undefined,
         studio_id: studioId,
         expense_type_id: expenseTypeId,
+        payment_status: String(data.get('payment_status') || 'Não pago'),
         reference_month: `${ref.year}-${pad(ref.month)}-01`,
         amount: numberValue(data.get('amount')),
         notes: String(data.get('notes') || '') || null
@@ -147,6 +169,7 @@ export function bindDespesas(refresh: () => void) {
     studioSelect!.value = entry.studio_id;
     syncExpenseTypeOptions(entry.studio_id);
     expenseTypeSelect!.value = entry.expense_type_id;
+    (form.elements.namedItem('payment_status') as HTMLSelectElement).value = entry.payment_status ?? 'Não pago';
     (form.elements.namedItem('amount') as HTMLInputElement).value = String(entry.amount);
     (form.elements.namedItem('notes') as HTMLTextAreaElement).value = entry.notes ?? '';
     submitButton!.textContent = 'Salvar alteração';

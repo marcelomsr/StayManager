@@ -120,12 +120,50 @@ create table if not exists public.expense_entries (
   company_id uuid not null references public.companies(id) on delete cascade,
   studio_id uuid not null references public.studios(id),
   expense_type_id uuid not null references public.expense_types(id),
+  payment_status text not null default 'Não pago' check (payment_status in ('Não pago', 'Pago')),
   reference_month date not null,
   amount numeric(12,2) not null default 0,
   notes text,
   created_at timestamptz not null default now(),
   updated_at timestamptz not null default now()
 );
+
+alter table public.expense_entries add column if not exists payment_status text not null default 'Não pago';
+
+drop trigger if exists validate_expense_entry_type_studio on public.expense_entries;
+
+update public.expense_entries
+set payment_status = case payment_status
+  when 'Recebido' then 'Pago'
+  when 'A receber' then 'Não pago'
+  else payment_status
+end
+where payment_status in ('A receber', 'Recebido');
+
+alter table public.expense_entries alter column payment_status set default 'Não pago';
+
+do $$
+declare
+  existing_constraint text;
+begin
+  select conname
+    into existing_constraint
+  from pg_constraint
+  where conrelid = 'public.expense_entries'::regclass
+    and contype = 'c'
+    and pg_get_constraintdef(oid) like '%payment_status in (''A receber'', ''Recebido'')%';
+
+  if existing_constraint is not null then
+    execute format('alter table public.expense_entries drop constraint %I', existing_constraint);
+  end if;
+
+  begin
+    alter table public.expense_entries
+      add constraint expense_entries_payment_status_check
+      check (payment_status in ('Não pago', 'Pago'));
+  exception when duplicate_object then null;
+  end;
+end $$;
 
 create unique index if not exists expense_entries_unique_by_studio_type_month
   on public.expense_entries(company_id, studio_id, expense_type_id, reference_month);
@@ -306,6 +344,7 @@ drop policy if exists "anon_delete_expense_type_studios" on public.expense_type_
 drop policy if exists "anon_select_expense_entries" on public.expense_entries;
 drop policy if exists "anon_insert_expense_entries" on public.expense_entries;
 drop policy if exists "anon_update_expense_entries" on public.expense_entries;
+drop policy if exists "anon_delete_expense_entries" on public.expense_entries;
 drop policy if exists "anon_select_cash_entries" on public.cash_entries;
 drop policy if exists "anon_insert_cash_entries" on public.cash_entries;
 drop policy if exists "anon_update_cash_entries" on public.cash_entries;

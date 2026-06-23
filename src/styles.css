@@ -60,6 +60,8 @@ table { width: 100%; border-collapse: collapse; min-width: 760px; }
 th, td { border-bottom: 1px solid var(--line); padding: 10px; text-align: left; vertical-align: top; font-size: 13px; }
 th { color: var(--muted); font-weight: 700; background: #f8fafc; }
 tr.upcoming td { background: #fff8db; }
+tr.paid td { background: #eaf4ff; }
+tr.unpaid td { background: #ffecec; }
 .row-actions { white-space: nowrap; display: flex; gap: 6px; }
 .badge { display: inline-flex; align-items: center; min-height: 24px; border-radius: 999px; padding: 3px 9px; background: color-mix(in srgb, var(--badge) 65%, white); color: #172033; font-size: 12px; }
 .month-nav { display: flex; align-items: center; gap: 10px; }

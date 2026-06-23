@@ -79,6 +79,7 @@ export type ExpenseEntry = {
   studio_id: Id;
   expense_type_id: Id;
   reference_month: string;
+  payment_status: string;
   amount: number;
   notes: string | null;
   expense_types?: ExpenseType;

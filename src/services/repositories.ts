@@ -103,6 +103,10 @@ export async function listExpenseTypes(companyId: Id) {
 }
 
 export async function saveExpenseType(companyId: Id, values: Partial<ExpenseType>, studioIds: Id[]) {
+  if (!studioIds.length) {
+    throw new Error('Selecione ao menos um studio para o tipo de gasto.');
+  }
+
   const { data, error } = await supabase
     .from('expense_types')
     .upsert({ id: values.id, company_id: companyId, name: values.name, active: values.active ?? true }, { onConflict: 'id' })
@@ -111,10 +115,8 @@ export async function saveExpenseType(companyId: Id, values: Partial<ExpenseType
   if (error) throw error;
   const expenseTypeId = data.id as Id;
   await supabase.from('expense_type_studios').delete().eq('expense_type_id', expenseTypeId);
-  if (studioIds.length) {
-    const { error: linkError } = await supabase.from('expense_type_studios').insert(studioIds.map((studio_id) => ({ expense_type_id: expenseTypeId, studio_id })));
-    if (linkError) throw linkError;
-  }
+  const { error: linkError } = await supabase.from('expense_type_studios').insert(studioIds.map((studio_id) => ({ expense_type_id: expenseTypeId, studio_id })));
+  if (linkError) throw linkError;
 }
 
 export async function listExpenseEntries(companyId: Id, year: number, month: number) {

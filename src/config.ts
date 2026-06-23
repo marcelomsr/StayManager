@@ -16,7 +16,7 @@ export const RESERVATION_STATUS_OPTIONS = [
 ] as const;
 
 export const PAYMENT_STATUS_OPTIONS = [
-  { name: 'A receber', color: '#f8a6c8' },
+  { name: 'A receber', color: '#ff8f8f' },
   { name: 'Recebido', color: '#8ec5ff' }
 ] as const;
 
