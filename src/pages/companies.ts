@@ -41,19 +41,23 @@ export function bindCompanies(refresh: () => void) {
       return;
     }
     
-    const companyData = { id: companyId, name: String(data.get('name')), active: isActive };
-    await saveCompany(companyData);
-    
-    // Atualizar o estado com a empresa modificada
-    const updatedCompanies = await listCompaniesAdmin();
-    state.companies = updatedCompanies as Company[];
-    if (companyId && state.company?.id === companyId) {
-      state.company = state.companies.find((c) => c.id === companyId) ?? state.company;
+    try {
+      const companyData = { id: companyId, name: String(data.get('name')), active: isActive };
+      await saveCompany(companyData);
+      
+      // Atualizar o estado com a empresa modificada
+      const updatedCompanies = await listCompaniesAdmin();
+      state.companies = updatedCompanies as Company[];
+      if (companyId && state.company?.id === companyId) {
+        state.company = state.companies.find((c) => c.id === companyId) ?? state.company;
+      }
+      emit();
+      
+      toast('Empresa salva.');
+      refresh();
+    } catch (error) {
+      toast(error instanceof Error ? error.message : 'Erro ao salvar empresa.', 'error');
     }
-    emit();
-    
-    toast('Empresa salva.');
-    refresh();
   });
   document.querySelectorAll<HTMLButtonElement>('[data-edit]').forEach((button) => button.addEventListener('click', () => {
     const company = companies.find((item) => item.id === button.dataset.edit)!;
@@ -77,15 +81,19 @@ export function bindCompanies(refresh: () => void) {
       return;
     }
     
-    await deleteCompany(deletedId);
-    
-    // Atualizar o estado: remover empresa deletada da lista
-    state.companies = state.companies.filter((c) => c.id !== deletedId);
-    if (state.company?.id === deletedId) {
-      state.company = state.companies[0] ?? null;
+    try {
+      await deleteCompany(deletedId);
+      
+      // Atualizar o estado: remover empresa deletada da lista
+      state.companies = state.companies.filter((c) => c.id !== deletedId);
+      if (state.company?.id === deletedId) {
+        state.company = state.companies[0] ?? null;
+      }
+      emit();
+      
+      refresh();
+    } catch (error) {
+      toast(error instanceof Error ? error.message : 'Erro ao excluir empresa.', 'error');
     }
-    emit();
-    
-    refresh();
   }));
 }

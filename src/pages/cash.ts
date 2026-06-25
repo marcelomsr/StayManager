@@ -80,15 +80,19 @@ export function bindCash(refresh: () => void) {
     }
     
     const data = new FormData(event.currentTarget as HTMLFormElement);
-    await saveCashEntry(state.company!.id, {
-      id: String(data.get('id') || '') || undefined,
-      kind: data.get('kind') as 'entrada' | 'saida',
-      entry_date: String(data.get('entry_date')),
-      description: String(data.get('description')),
-      amount: numberValue(data.get('amount'))
-    });
-    toast(data.get('id') ? 'Lançamento atualizado.' : 'Lançamento salvo.');
-    refresh();
+    try {
+      await saveCashEntry(state.company!.id, {
+        id: String(data.get('id') || '') || undefined,
+        kind: data.get('kind') as 'entrada' | 'saida',
+        entry_date: String(data.get('entry_date')),
+        description: String(data.get('description')),
+        amount: numberValue(data.get('amount'))
+      });
+      toast(data.get('id') ? 'Lançamento atualizado.' : 'Lançamento salvo.');
+      refresh();
+    } catch (error) {
+      toast(error instanceof Error ? error.message : 'Erro ao salvar lançamento.', 'error');
+    }
   });
 
   document.querySelectorAll<HTMLButtonElement>('[data-edit]').forEach((button) => {
