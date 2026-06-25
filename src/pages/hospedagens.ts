@@ -94,7 +94,7 @@ function stayForm(stay?: Stay) {
       <label>Saída <input type="datetime-local" name="check_out_at" value="${checkOutValue}" required /></label>
       <label>Hóspedes <textarea name="guests_names" required>${escapeHtml(stay?.guests_names)}</textarea></label>
       <label>Qtd. hóspedes <input type="number" min="1" name="guests_count" value="${stay?.guests_count ?? 1}" /></label>
-      <label>Data reserva <input type="date" name="reservation_date" value="${toDateInput(stay?.reservation_date)}" /></label>
+      <label>Data reserva <input type="date" name="reservation_date" value="${toDateInput(stay?.reservation_date)}" required /></label>
       <label>Qtd. diárias <input type="number" min="0" name="nights_count" value="${nightsValue}" /></label>
       <label>Plataforma <select name="platform_id" required>${platforms.map((item) => `<option value="${item.id}" ${stay?.platform_id === item.id ? 'selected' : ''}>${escapeHtml(item.name)}</option>`).join('')}</select></label>
       <label>Status reserva <select name="reservation_status">${RESERVATION_STATUS_OPTIONS.map((item) => `<option ${stay?.reservation_status === item.name ? 'selected' : ''}>${item.name}</option>`).join('')}</select></label>
@@ -148,15 +148,17 @@ export function bindHospedagens(refresh: () => void) {
     const checkIn = (form.check_in_at as HTMLInputElement).value;
     const checkOut = (form.check_out_at as HTMLInputElement).value;
     const nights = calculateNights(checkIn, checkOut);
-    if (!(form.nights_count as HTMLInputElement).value) (form.nights_count as HTMLInputElement).value = String(nights);
+    if (!(form.nights_count as HTMLInputElement).dataset.manual) (form.nights_count as HTMLInputElement).value = String(nights);
     const total = numberValue(new FormData(form).get('total_amount'));
     const fees = numberValue(new FormData(form).get('fees_amount'));
     if (!(form.net_amount as HTMLInputElement).dataset.manual) (form.net_amount as HTMLInputElement).value = String(total - fees);
     const net = optionalNumberValue(new FormData(form).get('net_amount'));
-    const currentNights = Number((form.nights_count as HTMLInputElement).value);
+    const nightsInputVal = (form.nights_count as HTMLInputElement).value;
+    const currentNights = nightsInputVal !== '' ? Number(nightsInputVal) : NaN;
     if (!(form.daily_amount as HTMLInputElement).dataset.manual) (form.daily_amount as HTMLInputElement).value = currentNights > 0 && net !== null ? String((net / currentNights).toFixed(2)) : '';
   };
   ['check_in_at', 'check_out_at', 'total_amount', 'fees_amount', 'nights_count'].forEach((name) => form[name].addEventListener('input', recalc));
+  form.nights_count.addEventListener('input', () => (form.nights_count.dataset.manual = 'true'));
   form.net_amount.addEventListener('input', () => (form.net_amount.dataset.manual = 'true'));
   form.daily_amount.addEventListener('input', () => (form.daily_amount.dataset.manual = 'true'));
   form.studio_id.addEventListener('change', () => {
@@ -183,6 +185,21 @@ export function bindHospedagens(refresh: () => void) {
       return;
     }
 
+    // Validar se diárias for zero, o status deve ser Cancelado
+    const nightsCount = Number(data.get('nights_count') || 0);
+    const reservationStatus = String(data.get('reservation_status'));
+    if (nightsCount === 0 && reservationStatus !== 'Cancelado') {
+      toast('Uma hospedagem com 0 diárias deve ter o status Cancelado.', 'error');
+      return;
+    }
+
+    // Validar se data da reserva está preenchida
+    const reservationDate = String(data.get('reservation_date') || '');
+    if (!reservationDate) {
+      toast('A data de reserva é obrigatória.', 'error');
+      return;
+    }
+
     try {
       await saveStay(state.company!.id, {
         id: String(data.get('id') || '') || undefined,
@@ -192,9 +209,9 @@ export function bindHospedagens(refresh: () => void) {
         check_out_at: String(data.get('check_out_at')),
         guests_names: String(data.get('guests_names')),
         guests_count: Number(data.get('guests_count') || 1),
-        reservation_date: String(data.get('reservation_date') || '') || null,
-        nights_count: Number(data.get('nights_count') || 0),
-        reservation_status: String(data.get('reservation_status')),
+        reservation_date: reservationDate,
+        nights_count: nightsCount,
+        reservation_status: reservationStatus,
         notes: String(data.get('notes') || '') || null,
         car_info: String(data.get('car_info') || '') || null,
         total_amount: numberValue(data.get('total_amount')),
