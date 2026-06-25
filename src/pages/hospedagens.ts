@@ -11,6 +11,12 @@ let stays: Stay[] = [];
 let studios: Studio[] = [];
 let platforms: Platform[] = [];
 
+const formatDateTime = (value: string) => {
+  if (!value) return '';
+  const date = new Date(value);
+  return date.toLocaleString('pt-BR', { dateStyle: 'short', timeStyle: 'short' });
+};
+
 export async function renderHospedagens() {
   if (!state.company) return appShell('');
   const params = new URLSearchParams(state.route.split('?')[1] ?? '');
@@ -38,8 +44,8 @@ export async function renderHospedagens() {
           <thead><tr><th>Entrada</th><th>Saída</th><th>Dia da saída</th><th>Studio</th><th>Hóspedes</th><th>Diárias</th><th>Plataforma</th><th>Status</th><th>Total</th><th>Líquido</th><th>Diária</th><th></th></tr></thead>
           <tbody>${stays.map((stay) => `
             <tr class="${isWithinNextDays(stay.check_in_at, 7) ? 'upcoming' : ''}">
-              <td>${new Date(stay.check_in_at).toLocaleString('pt-BR')}</td>
-              <td>${new Date(stay.check_out_at).toLocaleString('pt-BR')}</td>
+              <td>${formatDateTime(stay.check_in_at)}</td>
+              <td>${formatDateTime(stay.check_out_at)}</td>
               <td>${weekday(stay.check_out_at)}</td>
               <td>${escapeHtml(stay.studios?.name)}</td>
               <td>${escapeHtml(stay.guests_names)}</td>
