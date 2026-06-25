@@ -26,6 +26,13 @@ export async function renderCash() {
   entries = await listCashEntries(state.company.id, ref.year, ref.month);
   const entradas = entries.filter((item) => item.kind === 'entrada').reduce((sum, item) => sum + Number(item.amount), 0);
   const saidas = entries.filter((item) => item.kind === 'saida').reduce((sum, item) => sum + Number(item.amount), 0);
+  const entradasEntries = entries.filter((item) => item.kind === 'entrada');
+  const saidasEntries = entries.filter((item) => item.kind === 'saida');
+
+  const renderTable = (tableEntries: CashEntry[]) =>
+    `<table><thead><tr><th>Data</th><th>Descrição</th><th>Valor</th><th></th></tr></thead>
+     <tbody>${tableEntries.map((entry) => `<tr><td>${formatDate(entry.entry_date)}</td><td>${escapeHtml(entry.description)}</td><td>${brl(entry.amount)}</td><td class="row-actions"><button data-edit="${entry.id}">Editar</button><button class="danger" data-delete="${entry.id}">Excluir</button></td></tr>`).join('')}</tbody></table>`;
+
   return appShell(`
     ${pageHeader('Entradas e Saídas R$', `<div class="month-nav"><button id="prev-month" class="ghost">Anterior</button><strong>${monthLabel(ref)}</strong><button id="next-month" class="ghost">Próximo</button></div>`)}
     <section class="cards-grid">
@@ -43,10 +50,16 @@ export async function renderCash() {
         <label>Valor <input name="amount" inputmode="decimal" required /></label>
         <button id="cash-submit" class="primary">Salvar</button>
       </form>
-      <section class="panel table-wrap">
-        <table><thead><tr><th>Data</th><th>Tipo</th><th>Descrição</th><th>Valor</th><th></th></tr></thead>
-        <tbody>${entries.map((entry) => `<tr><td>${formatDate(entry.entry_date)}</td><td>${capitalizeKind(entry.kind)}</td><td>${escapeHtml(entry.description)}</td><td>${brl(entry.amount)}</td><td class="row-actions"><button data-edit="${entry.id}">Editar</button><button class="danger" data-delete="${entry.id}">Excluir</button></td></tr>`).join('')}</tbody></table>
-      </section>
+      <div class="stacked-panels">
+        <section class="panel table-wrap">
+          <h2>Entradas</h2>
+          ${renderTable(entradasEntries)}
+        </section>
+        <section class="panel table-wrap">
+          <h2>Saídas</h2>
+          ${renderTable(saidasEntries)}
+        </section>
+      </div>
     </section>
   `);
 }
