@@ -174,6 +174,15 @@ export function bindHospedagens(refresh: () => void) {
     
     recalc();
     const data = new FormData(form);
+    
+    // Validar datas de entrada e saída
+    const checkIn = String(data.get('check_in_at'));
+    const checkOut = String(data.get('check_out_at'));
+    if (checkOut.slice(0, 10) <= checkIn.slice(0, 10)) {
+      toast('A data de saída deve ser posterior à data de entrada (dias diferentes).', 'error');
+      return;
+    }
+
     try {
       await saveStay(state.company!.id, {
         id: String(data.get('id') || '') || undefined,
