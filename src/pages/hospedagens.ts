@@ -11,6 +11,22 @@ let stays: Stay[] = [];
 let studios: Studio[] = [];
 let platforms: Platform[] = [];
 
+// Função auxiliar local para formatar valores numéricos no padrão pt-BR para os inputs
+const formatarMoedaInput = (valor: number | null | undefined): string => {
+  if (valor === null || valor === undefined || isNaN(valor)) return '';
+  return new Intl.NumberFormat('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(valor);
+};
+
+// Função auxiliar para converter string pt-BR (195,67) em número JS válido (195.67)
+const converterStringParaNumero = (valor: any): number => {
+  if (!valor) return 0;
+  const texto = String(valor).trim();
+  if (texto.includes(',')) {
+    return Number(texto.replace(/\./g, '').replace(',', '.'));
+  }
+  return Number(texto) || 0;
+};
+
 const formatDateTime = (value: string) => {
   if (!value) return '';
   const date = new Date(value);
@@ -106,10 +122,10 @@ function stayForm(stay?: Stay) {
       <label>Status reserva <select name="reservation_status">${RESERVATION_STATUS_OPTIONS.map((item) => `<option ${stay?.reservation_status === item.name ? 'selected' : ''}>${item.name}</option>`).join('')}</select></label>
       <label>Observação <textarea name="notes">${escapeHtml(stay?.notes)}</textarea></label>
       <label class="garage-field ${studio?.has_garage ? '' : 'hidden'}">Informações do carro <textarea name="car_info">${escapeHtml(stay?.car_info)}</textarea></label>
-      <label>Valor total <input name="total_amount" inputmode="decimal" value="${stay?.total_amount ?? 0}" /></label>
-      <label>Taxas <input name="fees_amount" inputmode="decimal" value="${stay?.fees_amount ?? 0}" /></label>
-      <label>Valor líquido <input name="net_amount" inputmode="decimal" value="${stay?.net_amount ?? ''}" /></label>
-      <label>Valor diária <input name="daily_amount" inputmode="decimal" value="${stay?.daily_amount ?? ''}" /></label>
+      <label>Valor total <input name="total_amount" inputmode="decimal" value="${formatarMoedaInput(stay?.total_amount ?? 0)}" /></label>
+      <label>Taxas <input name="fees_amount" inputmode="decimal" value="${formatarMoedaInput(stay?.fees_amount ?? 0)}" /></label>
+      <label>Valor líquido <input name="net_amount" inputmode="decimal" value="${formatarMoedaInput(stay?.net_amount)}" readonly style="background-color: #f1f3f5; cursor: not-allowed;" /></label>
+      <label>Valor diária <input name="daily_amount" inputmode="decimal" value="${formatarMoedaInput(stay?.daily_amount)}" readonly style="background-color: #f1f3f5; cursor: not-allowed;" /></label>
       <label>Status pagamento <select name="payment_status">${PAYMENT_STATUS_OPTIONS.map((item) => `<option ${stay?.payment_status === item.name ? 'selected' : ''}>${item.name}</option>`).join('')}</select></label>
       <div style="display: flex; gap: 8px;">
         <button class="primary">${stay ? 'Salvar alteração' : 'Salvar hospedagem'}</button>
@@ -150,31 +166,58 @@ export function bindHospedagens(refresh: () => void) {
 
   const form = qs<HTMLFormElement>('#stay-form');
   if (!form) return;
+
   const recalc = () => {
     const checkIn = (form.check_in_at as HTMLInputElement).value;
     const checkOut = (form.check_out_at as HTMLInputElement).value;
     const nights = calculateNights(checkIn, checkOut);
-    if (!(form.nights_count as HTMLInputElement).dataset.manual) (form.nights_count as HTMLInputElement).value = String(nights);
-    const total = numberValue(new FormData(form).get('total_amount'));
-    const fees = numberValue(new FormData(form).get('fees_amount'));
-    if (!(form.net_amount as HTMLInputElement).dataset.manual) (form.net_amount as HTMLInputElement).value = String(total - fees);
-    const net = optionalNumberValue(new FormData(form).get('net_amount'));
+    
+    if (!(form.nights_count as HTMLInputElement).dataset.manual) {
+      (form.nights_count as HTMLInputElement).value = String(nights);
+    }
+    
+    const total = converterStringParaNumero((form.total_amount as HTMLInputElement).value);
+    const fees = converterStringParaNumero((form.fees_amount as HTMLInputElement).value);
+    
+    const net = total - fees;
+    (form.net_amount as HTMLInputElement).value = formatarMoedaInput(net);
+    
     const nightsInputVal = (form.nights_count as HTMLInputElement).value;
     const currentNights = nightsInputVal !== '' ? Number(nightsInputVal) : NaN;
-    if (!(form.daily_amount as HTMLInputElement).dataset.manual) (form.daily_amount as HTMLInputElement).value = currentNights > 0 && net !== null ? String((net / currentNights).toFixed(2)) : '';
+    
+    if (currentNights > 0 && !isNaN(net)) {
+      (form.daily_amount as HTMLInputElement).value = formatarMoedaInput(net / currentNights);
+    } else {
+      (form.daily_amount as HTMLInputElement).value = '';
+    }
   };
+  
   ['check_in_at', 'check_out_at', 'total_amount', 'fees_amount', 'nights_count'].forEach((name) => form[name].addEventListener('input', recalc));
   form.nights_count.addEventListener('input', () => (form.nights_count.dataset.manual = 'true'));
-  form.net_amount.addEventListener('input', () => (form.net_amount.dataset.manual = 'true'));
-  form.daily_amount.addEventListener('input', () => (form.daily_amount.dataset.manual = 'true'));
   form.studio_id.addEventListener('change', () => {
     const studio = studios.find((item) => item.id === form.studio_id.value);
     qs<HTMLElement>('.garage-field', form)?.classList.toggle('hidden', !studio?.has_garage);
   });
+
+  // --- NOVO BLOCO: Bloquear a digitação de Ponto nos campos numéricos de valor ---
+  ['total_amount', 'fees_amount'].forEach((name) => {
+    const inputElement = form[name] as HTMLInputElement;
+    if (inputElement) {
+      inputElement.addEventListener('keydown', (event: KeyboardEvent) => {
+        if (event.key === '.' || event.key === ',') {
+          // Se for ponto, bloqueia totalmente
+          if (event.key === '.') {
+            event.preventDefault();
+          }
+        }
+      });
+    }
+  });
+  // -------------------------------------------------------------------------------
+
   form.addEventListener('submit', async (event) => {
     event.preventDefault();
     
-    // Validar se a empresa está ativa
     if (!isCompanyActive()) {
       toast('Não é possível cadastrar em uma empresa inativa.', 'error');
       return;
@@ -183,7 +226,6 @@ export function bindHospedagens(refresh: () => void) {
     recalc();
     const data = new FormData(form);
     
-    // Validar datas de entrada e saída
     const checkIn = String(data.get('check_in_at'));
     const checkOut = String(data.get('check_out_at'));
     if (checkOut.slice(0, 10) <= checkIn.slice(0, 10)) {
@@ -191,7 +233,6 @@ export function bindHospedagens(refresh: () => void) {
       return;
     }
 
-    // Validar se diárias for zero, o status deve ser Cancelado
     const nightsCount = Number(data.get('nights_count') || 0);
     const reservationStatus = String(data.get('reservation_status'));
     if (nightsCount === 0 && reservationStatus !== 'Cancelado') {
@@ -199,12 +240,16 @@ export function bindHospedagens(refresh: () => void) {
       return;
     }
 
-    // Validar se data da reserva está preenchida
     const reservationDate = String(data.get('reservation_date') || '');
     if (!reservationDate) {
       toast('A data de reserva é obrigatória.', 'error');
       return;
     }
+
+    const total_amount = converterStringParaNumero((form.total_amount as HTMLInputElement).value);
+    const fees_amount = converterStringParaNumero((form.fees_amount as HTMLInputElement).value);
+    const net_amount = total_amount - fees_amount;
+    const daily_amount = nightsCount > 0 ? (net_amount / nightsCount) : null;
 
     try {
       await saveStay(state.company!.id, {
@@ -220,10 +265,10 @@ export function bindHospedagens(refresh: () => void) {
         reservation_status: reservationStatus,
         notes: String(data.get('notes') || '') || null,
         car_info: String(data.get('car_info') || '') || null,
-        total_amount: numberValue(data.get('total_amount')),
-        fees_amount: numberValue(data.get('fees_amount')),
-        net_amount: optionalNumberValue(data.get('net_amount')),
-        daily_amount: Number(data.get('nights_count') || 0) > 0 ? optionalNumberValue(data.get('daily_amount')) : null,
+        total_amount: total_amount,
+        fees_amount: fees_amount,
+        net_amount: net_amount,
+        daily_amount: daily_amount,
         payment_status: String(data.get('payment_status'))
       });
       toast('Hospedagem salva.');
