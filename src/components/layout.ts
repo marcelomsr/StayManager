@@ -62,7 +62,9 @@ export function pageHeader(title: string, action = '') {
 }
 
 export function requireCompany() {
-  if (state.company) return '';
+  // SE houver empresa OU se a rota atual for a de empresas, não bloqueia a tela
+  if (state.company || state.route === '/empresas') return '';
+  
   return appShell(`
     <section class="empty-state">
       <h1>Selecione uma empresa</h1>

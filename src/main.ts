@@ -29,7 +29,9 @@ async function render() {
       bindLogin();
       return;
     }
-    if (!state.company && !state.route.startsWith('/perfil')) {
+    
+    // CORREÇÃO: Abre exceção para a rota de /empresas além da de /perfil
+    if (!state.company && !state.route.startsWith('/perfil') && !state.route.startsWith('/empresas')) {
       app.innerHTML = requireCompany();
       bindLayout();
       return;
