@@ -23,11 +23,23 @@ let entries: CashEntry[] = [];
 
 export async function renderCash() {
   if (!state.company) return appShell('');
+  
+  // 1. Busca as entradas filtradas do mês atual para as tabelas e métricas mensais
   entries = await listCashEntries(state.company.id, ref.year, ref.month);
+  
+  // 2. Busca TODOS os lançamentos da história da empresa para calcular o Saldo Total global
+  const allEntries = await listCashEntries(state.company.id, undefined, undefined) as CashEntry[] || [];
+
+  // Cálculos do mês atual
   const entradas = entries.filter((item) => item.kind === 'entrada').reduce((sum, item) => sum + Number(item.amount), 0);
   const saidas = entries.filter((item) => item.kind === 'saida').reduce((sum, item) => sum + Number(item.amount), 0);
   const entradasEntries = entries.filter((item) => item.kind === 'entrada');
   const saidasEntries = entries.filter((item) => item.kind === 'saida');
+
+  // Cálculo Histórico Global (Saldo Total)
+  const totalEntradasGlobal = allEntries.filter((item) => item.kind === 'entrada').reduce((sum, item) => sum + Number(item.amount), 0);
+  const totalSaidasGlobal = allEntries.filter((item) => item.kind === 'saida').reduce((sum, item) => sum + Number(item.amount), 0);
+  const saldoTotalGlobal = totalEntradasGlobal - totalSaidasGlobal;
 
   const renderTable = (tableEntries: CashEntry[]) =>
     `<table><thead><tr><th>Data</th><th>Descrição</th><th>Valor</th><th></th></tr></thead>
@@ -39,6 +51,7 @@ export async function renderCash() {
       <article class="metric-card"><span>Entradas</span><strong>${brl(entradas)}</strong></article>
       <article class="metric-card"><span>Saídas</span><strong>${brl(saidas)}</strong></article>
       <article class="metric-card"><span>Saldo do mês</span><strong>${brl(entradas - saidas)}</strong></article>
+      <article class="metric-card" style="border-left: 4px solid #228be6;"><span>Saldo Total</span><strong>${brl(saldoTotalGlobal)}</strong></article>
     </section>
     <section class="split">
       <form id="cash-form" class="panel form-grid">
@@ -73,7 +86,6 @@ export function bindCash(refresh: () => void) {
   qs<HTMLFormElement>('#cash-form')?.addEventListener('submit', async (event) => {
     event.preventDefault();
     
-    // Validar se a empresa está ativa
     if (!isCompanyActive()) {
       toast('Não é possível cadastrar em uma empresa inativa.', 'error');
       return;
