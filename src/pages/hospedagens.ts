@@ -120,6 +120,11 @@ function stayForm(stay?: Stay) {
   const checkOutValue = stay ? toDateTimeInput(stay.check_out_at) : defaultCheckOutTime();
   const nightsValue = stay ? stay.nights_count : 1;
 
+  // CONDICIONAL: Verifica se a hospedagem atual está com status cancelado para liberar a edição visual logo de início
+  const isCancelado = stay?.reservation_status === 'Cancelado';
+  const readonlyAttr = isCancelado ? '' : 'readonly';
+  const backgroundStyle = isCancelado ? '' : 'background-color: #f1f3f5; cursor: not-allowed;';
+
   return `
     <form id="stay-form" class="panel form-grid">
       <h2>${stay ? 'Editar hospedagem' : 'Nova hospedagem'}</h2>
@@ -137,7 +142,7 @@ function stayForm(stay?: Stay) {
       <label class="garage-field ${studio?.has_garage ? '' : 'hidden'}">Informações do carro <textarea name="car_info">${escapeHtml(stay?.car_info)}</textarea></label>
       <label>Valor total <input name="total_amount" inputmode="decimal" value="${formatarMoedaInput(stay?.total_amount ?? 0)}" /></label>
       <label>Taxas <input name="fees_amount" inputmode="decimal" value="${formatarMoedaInput(stay?.fees_amount ?? 0)}" /></label>
-      <label>Valor líquido <input name="net_amount" inputmode="decimal" value="${formatarMoedaInput(stay?.net_amount)}" readonly style="background-color: #f1f3f5; cursor: not-allowed;" /></label>
+      <label>Valor líquido <input name="net_amount" inputmode="decimal" value="${formatarMoedaInput(stay?.net_amount)}" ${readonlyAttr} style="${backgroundStyle}" /></label>
       <label>Valor diária <input name="daily_amount" inputmode="decimal" value="${formatarMoedaInput(stay?.daily_amount)}" readonly style="background-color: #f1f3f5; cursor: not-allowed;" /></label>
       <label>Status pagamento <select name="payment_status">${PAYMENT_STATUS_OPTIONS.map((item) => `<option ${stay?.payment_status === item.name ? 'selected' : ''}>${item.name}</option>`).join('')}</select></label>
       <div style="display: flex; gap: 8px;">
@@ -183,6 +188,7 @@ export function bindHospedagens(refresh: () => void) {
   const recalc = () => {
     const checkIn = (form.check_in_at as HTMLInputElement).value;
     const checkOut = (form.check_out_at as HTMLInputElement).value;
+    const statusReserva = (form.reservation_status as HTMLSelectElement).value;
     const nights = calculateNights(checkIn, checkOut);
     
     if (!(form.nights_count as HTMLInputElement).dataset.manual) {
@@ -192,14 +198,19 @@ export function bindHospedagens(refresh: () => void) {
     const total = converterStringParaNumero((form.total_amount as HTMLInputElement).value);
     const fees = converterStringParaNumero((form.fees_amount as HTMLInputElement).value);
     
-    const net = total - fees;
-    (form.net_amount as HTMLInputElement).value = formatarMoedaInput(net);
+    // REGRA DE CÁLCULO AUTO: Só calcula o líquido automaticamente se o status NÃO for Cancelado, ou se for cancelado e o campo estiver vazio
+    const netInput = form.net_amount as HTMLInputElement;
+    if (statusReserva !== 'Cancelado' || !netInput.value) {
+      const net = total - fees;
+      netInput.value = formatarMoedaInput(net);
+    }
     
+    const netFinal = converterStringParaNumero(netInput.value);
     const nightsInputVal = (form.nights_count as HTMLInputElement).value;
     const currentNights = nightsInputVal !== '' ? Number(nightsInputVal) : NaN;
     
-    if (currentNights > 0 && !isNaN(net)) {
-      (form.daily_amount as HTMLInputElement).value = formatarMoedaInput(net / currentNights);
+    if (currentNights > 0 && !isNaN(netFinal)) {
+      (form.daily_amount as HTMLInputElement).value = formatarMoedaInput(netFinal / currentNights);
     } else {
       (form.daily_amount as HTMLInputElement).value = '';
     }
@@ -207,12 +218,30 @@ export function bindHospedagens(refresh: () => void) {
   
   ['check_in_at', 'check_out_at', 'total_amount', 'fees_amount', 'nights_count'].forEach((name) => form[name].addEventListener('input', recalc));
   form.nights_count.addEventListener('input', () => (form.nights_count.dataset.manual = 'true'));
+  
+  // OUVINTE DINÂMICO: Se mudar o select de status em tempo real, bloqueia ou desbloqueia o campo líquido
+  form.reservation_status.addEventListener('change', () => {
+    const status = form.reservation_status.value;
+    const netInput = form.net_amount as HTMLInputElement;
+    if (status === 'Cancelado') {
+      netInput.removeAttribute('readonly');
+      netInput.style.backgroundColor = '';
+      netInput.style.cursor = '';
+    } else {
+      netInput.setAttribute('readonly', 'true');
+      netInput.style.backgroundColor = '#f1f3f5';
+      netInput.style.cursor = 'not-allowed';
+      recalc(); // Refaz o cálculo matemático padrão se voltar para outro status
+    }
+  });
+
   form.studio_id.addEventListener('change', () => {
     const studio = studios.find((item) => item.id === form.studio_id.value);
     qs<HTMLElement>('.garage-field', form)?.classList.toggle('hidden', !studio?.has_garage);
   });
 
-  ['total_amount', 'fees_amount'].forEach((name) => {
+  // Permitir digitação de vírgula e travar o ponto
+  ['total_amount', 'fees_amount', 'net_amount'].forEach((name) => {
     const inputElement = form[name] as HTMLInputElement;
     if (inputElement) {
       inputElement.addEventListener('keydown', (event: KeyboardEvent) => {
@@ -256,7 +285,9 @@ export function bindHospedagens(refresh: () => void) {
 
     const total_amount = converterStringParaNumero((form.total_amount as HTMLInputElement).value);
     const fees_amount = converterStringParaNumero((form.fees_amount as HTMLInputElement).value);
-    const net_amount = total_amount - fees_amount;
+    
+    // Captura o valor líquido de forma dinâmica (seja calculado ou digitado no caso do Cancelado)
+    const net_amount = converterStringParaNumero((form.net_amount as HTMLInputElement).value);
     const daily_amount = nightsCount > 0 ? (net_amount / nightsCount) : null;
 
     try {
