@@ -36,13 +36,20 @@ const formatDateTime = (value: string) => {
 // Função auxiliar para anexar o fuso horário local e evitar perda de horas
 const formatarISOComFusoLocal = (dateTimeStr: string): string => {
   if (!dateTimeStr) return '';
-  if (dateTimeStr.includes('Z') || dateTimeStr.includes('-') && dateTimeStr.length > 16) return dateTimeStr;
+  // Se já tiver fuso ou formato completo, não mexe
+  if (dateTimeStr.includes('Z') || (dateTimeStr.includes('+') && dateTimeStr.length > 16)) return dateTimeStr;
+  
+  // Garante que a string tenha os segundos (:00) antes do fuso
+  let baseDateTime = dateTimeStr;
+  if (baseDateTime.length === 16) {
+    baseDateTime += ':00';
+  }
   
   const date = new Date(dateTimeStr);
   const tzo = -date.getTimezoneOffset();
   const dif = tzo >= 0 ? '+' : '-';
   
-  return dateTimeStr + dif + pad(Math.floor(Math.abs(tzo) / 60)) + ':' + pad(Math.abs(tzo) % 60);
+  return baseDateTime + dif + pad(Math.floor(Math.abs(tzo) / 60)) + ':' + pad(Math.abs(tzo) % 60);
 };
 
 export async function renderHospedagens() {
