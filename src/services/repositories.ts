@@ -83,9 +83,12 @@ export async function hasStayConflict(companyId: Id, studioId: Id, checkIn: stri
     .eq('company_id', companyId)
     .eq('studio_id', studioId)
     .is('deleted_at', null)
+    // NOVA REGRA: Só gera conflito se a hospedagem existente NÃO estiver cancelada
+    .neq('reservation_status', 'Cancelado') 
     .lt('check_in_at', checkOut)
     .gt('check_out_at', checkIn)
     .limit(1);
+    
   if (stayId) query = query.neq('id', stayId);
   const { data, error } = await query;
   if (error) throw error;
