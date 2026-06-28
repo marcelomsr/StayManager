@@ -77,8 +77,6 @@ export async function listMonthStays(companyId: Id, year: number, month: number,
 }
 
 export async function hasStayConflict(companyId: Id, studioId: Id, checkIn: string, checkOut: string, stayId?: Id) {
-  // NORMALIZAÇÃO: Transforma as strings recebidas em instâncias de Date e gera o formato ISO puro (Z)
-  // Isso limpa os caracteres de fuso horário local que quebram a comparação de maior/menor no Supabase
   const isoCheckIn = new Date(checkIn).toISOString();
   const isoCheckOut = new Date(checkOut).toISOString();
 
@@ -88,8 +86,7 @@ export async function hasStayConflict(companyId: Id, studioId: Id, checkIn: stri
     .eq('company_id', companyId)
     .eq('studio_id', studioId)
     .is('deleted_at', null)
-    // Mantém a regra de ignorar as hospedagens canceladas
-    .neq('reservation_status', 'Cancelado') 
+    .neq('reservation_status', 'Cancelado') // Desconsidera os registros com status Cancelado
     .lt('check_in_at', isoCheckOut)
     .gt('check_out_at', isoCheckIn)
     .limit(1);

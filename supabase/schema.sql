@@ -92,10 +92,11 @@ create table if not exists public.stays (
   created_at timestamptz not null default now(),
   updated_at timestamptz not null default now(),
   check (check_out_at > check_in_at),
+  -- AQUI ESTÁ O AJUSTE: Adicionamos a regra para o banco ignorar os 'Cancelado' na exclusão de período
   exclude using gist (
     studio_id with =,
     tstzrange(check_in_at, check_out_at, '[)') with &&
-  ) where (deleted_at is null)
+  ) where (deleted_at is null and reservation_status <> 'Cancelado')
 );
 
 create table if not exists public.expense_types (
