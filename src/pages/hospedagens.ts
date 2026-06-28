@@ -33,10 +33,9 @@ const formatDateTime = (value: string) => {
   return date.toLocaleString('pt-BR', { dateStyle: 'short', timeStyle: 'short' });
 };
 
-// Nova função auxiliar para anexar o fuso horário local e evitar perda de horas
+// Função auxiliar para anexar o fuso horário local e evitar perda de horas
 const formatarISOComFusoLocal = (dateTimeStr: string): string => {
   if (!dateTimeStr) return '';
-  // Se já tiver informação de fuso, retorna direto
   if (dateTimeStr.includes('Z') || dateTimeStr.includes('-') && dateTimeStr.length > 16) return dateTimeStr;
   
   const date = new Date(dateTimeStr);
@@ -70,7 +69,7 @@ export async function renderHospedagens() {
       ${stayForm(edit)}
       <section class="panel table-wrap">
         <table>
-          <thead><tr><th>Entrada</th><th>Saída</th><th>Dia da saída</th><th>Studio</th><th>Hóspedes</th><th>Diárias</th><th>Plataforma</th><th>Status</th><th>Total</th><th>Líquido</th><th>Diária</th><th></th></tr></thead>
+          <thead><tr><th>Entrada</th><th>Saída</th><th>Dia da saída</th><th>Studio</th><th>Hóspedes</th><th>Diárias</th><th>Plataforma</th><th>Status</th><th>Total</th><th>Taxas</th><th>Líquido</th><th>Diária</th><th></th></tr></thead>
           <tbody>${stays.map((stay) => `
             <tr class="${isWithinNextDays(stay.check_in_at, 7) ? 'upcoming' : ''}">
               <td>${formatDateTime(stay.check_in_at)}</td>
@@ -82,6 +81,7 @@ export async function renderHospedagens() {
               <td>${badge(stay.platforms?.name ?? '', stay.platforms?.color)}</td>
               <td>${badge(stay.reservation_status, RESERVATION_STATUS_OPTIONS.find((item) => item.name === stay.reservation_status)?.color)}</td>
               <td>${brl(stay.total_amount)}</td>
+              <td>${brl(stay.fees_amount)}</td>
               <td>${brl(stay.net_amount)}</td>
               <td>${brl(stay.daily_amount)}</td>
               <td class="row-actions"><button data-edit="${stay.id}">Editar</button><button class="danger" data-delete="${stay.id}">Excluir</button></td>
@@ -264,7 +264,6 @@ export function bindHospedagens(refresh: () => void) {
         id: String(data.get('id') || '') || undefined,
         studio_id: String(data.get('studio_id')),
         platform_id: String(data.get('platform_id')),
-        // Aplicando a nova função auxiliar de fuso horário local aqui:
         check_in_at: formatarISOComFusoLocal(checkIn),
         check_out_at: formatarISOComFusoLocal(checkOut),
         guests_names: String(data.get('guests_names')),
