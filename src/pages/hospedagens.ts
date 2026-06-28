@@ -33,6 +33,19 @@ const formatDateTime = (value: string) => {
   return date.toLocaleString('pt-BR', { dateStyle: 'short', timeStyle: 'short' });
 };
 
+// Nova função auxiliar para anexar o fuso horário local e evitar perda de horas
+const formatarISOComFusoLocal = (dateTimeStr: string): string => {
+  if (!dateTimeStr) return '';
+  // Se já tiver informação de fuso, retorna direto
+  if (dateTimeStr.includes('Z') || dateTimeStr.includes('-') && dateTimeStr.length > 16) return dateTimeStr;
+  
+  const date = new Date(dateTimeStr);
+  const tzo = -date.getTimezoneOffset();
+  const dif = tzo >= 0 ? '+' : '-';
+  
+  return dateTimeStr + dif + pad(Math.floor(Math.abs(tzo) / 60)) + ':' + pad(Math.abs(tzo) % 60);
+};
+
 export async function renderHospedagens() {
   if (!state.company) return appShell('');
   const params = new URLSearchParams(state.route.split('?')[1] ?? '');
@@ -199,21 +212,16 @@ export function bindHospedagens(refresh: () => void) {
     qs<HTMLElement>('.garage-field', form)?.classList.toggle('hidden', !studio?.has_garage);
   });
 
-  // --- NOVO BLOCO: Bloquear a digitação de Ponto nos campos numéricos de valor ---
   ['total_amount', 'fees_amount'].forEach((name) => {
     const inputElement = form[name] as HTMLInputElement;
     if (inputElement) {
       inputElement.addEventListener('keydown', (event: KeyboardEvent) => {
-        if (event.key === '.' || event.key === ',') {
-          // Se for ponto, bloqueia totalmente
-          if (event.key === '.') {
-            event.preventDefault();
-          }
+        if (event.key === '.') {
+          event.preventDefault();
         }
       });
     }
   });
-  // -------------------------------------------------------------------------------
 
   form.addEventListener('submit', async (event) => {
     event.preventDefault();
@@ -256,8 +264,9 @@ export function bindHospedagens(refresh: () => void) {
         id: String(data.get('id') || '') || undefined,
         studio_id: String(data.get('studio_id')),
         platform_id: String(data.get('platform_id')),
-        check_in_at: String(data.get('check_in_at')),
-        check_out_at: String(data.get('check_out_at')),
+        // Aplicando a nova função auxiliar de fuso horário local aqui:
+        check_in_at: formatarISOComFusoLocal(checkIn),
+        check_out_at: formatarISOComFusoLocal(checkOut),
         guests_names: String(data.get('guests_names')),
         guests_count: Number(data.get('guests_count') || 1),
         reservation_date: reservationDate,
@@ -271,7 +280,11 @@ export function bindHospedagens(refresh: () => void) {
         daily_amount: daily_amount,
         payment_status: String(data.get('payment_status'))
       });
+      
       toast('Hospedagem salva.');
+      
+      form.reset();
+      delete (form.nights_count as HTMLInputElement).dataset.manual;
       location.hash = '/hospedagens';
       refresh();
     } catch (error) {
