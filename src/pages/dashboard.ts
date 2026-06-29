@@ -2,36 +2,54 @@ import { PAYMENT_STATUS_OPTIONS, RESERVATION_STATUS_OPTIONS } from '../config';
 import { renderCalendar } from '../components/calendar';
 import { escapeHtml, html, qs } from '../components/dom';
 import { appShell, pageHeader } from '../components/layout';
-import { listMonthStays } from '../services/repositories';
+import { listMonthStays, listStudios } from '../services/repositories';
 import { navigate, state } from '../state/app-state';
-import { Stay, MonthRef } from '../types';
-import { addMonths, currentMonthRef, monthBounds, monthLabel, weekday } from '../utils/date';
+import { Stay, MonthRef, Studio } from '../types';
+import { addMonths, calculateNights, currentMonthRef, monthBounds, monthLabel, weekday } from '../utils/date';
 import { brl } from '../utils/format';
 
 let ref: MonthRef = currentMonthRef();
 let stays: Stay[] = [];
+let studios: Studio[] = [];
+let selectedStudioId = '';
 
 function overlapNightsInMonth(stay: Stay, current: MonthRef) {
   const { start, end } = monthBounds(current);
-  const inDate = new Date(stay.check_in_at.slice(0, 10));
-  const outDate = new Date(stay.check_out_at.slice(0, 10));
-  const startDate = new Date(start);
-  const endExclusive = new Date(end);
-  endExclusive.setDate(endExclusive.getDate() + 1);
-  const from = inDate > startDate ? inDate : startDate;
-  const to = outDate < endExclusive ? outDate : endExclusive;
-  return Math.max(0, Math.round((to.getTime() - from.getTime()) / 86_400_000));
+  const toUtc = (value: string) => {
+    const [year, month, day] = value.slice(0, 10).split('-').map(Number);
+    return Date.UTC(year, month - 1, day);
+  };
+  const monthStart = toUtc(start);
+  const monthEndExclusive = toUtc(end) + 86_400_000;
+  const overlapStart = Math.max(toUtc(stay.check_in_at), monthStart);
+  const overlapEnd = Math.min(toUtc(stay.check_out_at), monthEndExclusive);
+  return Math.max(0, Math.round((overlapEnd - overlapStart) / 86_400_000));
+}
+
+function amountInMonth(stay: Stay, amount: number | null | undefined, current: MonthRef) {
+  const totalNights = calculateNights(stay.check_in_at, stay.check_out_at);
+  if (!totalNights) return 0;
+  return Number(amount ?? 0) * overlapNightsInMonth(stay, current) / totalNights;
 }
 
 export async function renderDashboard() {
   if (!state.company) return appShell('');
-  stays = await listMonthStays(state.company.id, ref.year, ref.month);
+  [studios, stays] = await Promise.all([
+    listStudios(state.company.id),
+    listMonthStays(state.company.id, ref.year, ref.month, selectedStudioId || undefined)
+  ]);
+  if (selectedStudioId && !studios.some((studio) => studio.id === selectedStudioId)) {
+    selectedStudioId = '';
+    stays = await listMonthStays(state.company.id, ref.year, ref.month);
+  }
   const reservations = stays.length;
-  const total = stays.reduce((sum, stay) => sum + Number(stay.total_amount ?? 0), 0);
-  const fees = stays.reduce((sum, stay) => sum + Number(stay.fees_amount ?? 0), 0);
-  const net = stays.reduce((sum, stay) => sum + Number(stay.net_amount ?? 0), 0);
+  const total = stays.reduce((sum, stay) => sum + amountInMonth(stay, stay.total_amount, ref), 0);
+  const fees = stays.reduce((sum, stay) => sum + amountInMonth(stay, stay.fees_amount, ref), 0);
+  const net = stays.reduce((sum, stay) => sum + amountInMonth(stay, stay.net_amount, ref), 0);
   const nights = stays.reduce((sum, stay) => sum + overlapNightsInMonth(stay, ref), 0);
-  const taxableTotal = stays.filter((stay) => stay.platforms?.name !== 'Particular').reduce((sum, stay) => sum + Number(stay.total_amount ?? 0), 0);
+  const taxableTotal = stays
+    .filter((stay) => stay.platforms?.name !== 'Particular')
+    .reduce((sum, stay) => sum + amountInMonth(stay, stay.total_amount, ref), 0);
   const tax = taxableTotal * 0.06;
   const exempt = taxableTotal * 0.32;
   const dailyAverage = nights ? net / nights : 0;
@@ -39,6 +57,10 @@ export async function renderDashboard() {
   return appShell(html`
     ${pageHeader('Dashboard', `
       <div class="month-nav">
+        <select id="dashboard-studio-filter" aria-label="Filtrar por studio">
+          <option value="">Todos</option>
+          ${studios.map((studio) => `<option value="${studio.id}" ${studio.id === selectedStudioId ? 'selected' : ''}>${escapeHtml(studio.name)}</option>`).join('')}
+        </select>
         <button id="prev-month" class="ghost">Anterior</button>
         <strong>${monthLabel(ref)}</strong>
         <button id="next-month" class="ghost">Próximo</button>
@@ -91,6 +113,10 @@ function badge(label: string, color = '#d8dde8') {
 }
 
 export function bindDashboard() {
+  qs<HTMLSelectElement>('#dashboard-studio-filter')?.addEventListener('change', (event) => {
+    selectedStudioId = (event.currentTarget as HTMLSelectElement).value;
+    window.dispatchEvent(new HashChangeEvent('hashchange'));
+  });
   qs<HTMLButtonElement>('#prev-month')?.addEventListener('click', async () => {
     ref = addMonths(ref, -1);
     navigate('/dashboard');
