@@ -100,8 +100,10 @@ export async function hasStayConflict(companyId: Id, studioId: Id, checkIn: stri
 
 export async function saveStay(companyId: Id, values: Partial<Stay>) {
   const payload = { ...values, company_id: companyRequired(companyId) };
-  const conflict = await hasStayConflict(companyId, payload.studio_id!, payload.check_in_at!, payload.check_out_at!, payload.id);
-  if (conflict) throw new Error('Já existe uma hospedagem com período sobreposto para este studio.');
+  if (payload.reservation_status !== 'Cancelado') {
+    const conflict = await hasStayConflict(companyId, payload.studio_id!, payload.check_in_at!, payload.check_out_at!, payload.id);
+    if (conflict) throw new Error('Já existe uma hospedagem com período sobreposto para este studio.');
+  }
   const { error } = values.id ? await supabase.from('stays').update(payload).eq('id', values.id) : await supabase.from('stays').insert(payload);
   if (error) throw error;
 }
