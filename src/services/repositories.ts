@@ -59,14 +59,15 @@ export async function listStays(companyId: Id, filters: Record<string, string> =
 }
 
 export async function listMonthStays(companyId: Id, year: number, month: number, studioId?: Id) {
-  const { start, end } = monthBounds({ year, month });
+  const monthStart = new Date(year, month - 1, 1).toISOString();
+  const nextMonthStart = new Date(year, month, 1).toISOString();
   let query = supabase
     .from('stays')
     .select('*,studios(*),platforms(*)')
     .eq('company_id', companyId)
     .is('deleted_at', null)
-    .lt('check_in_at', `${end}T23:59:59`)
-    .gt('check_out_at', `${start}T00:00:00`)
+    .lt('check_in_at', nextMonthStart)
+    .gt('check_out_at', monthStart)
     .order('check_in_at');
 
   if (studioId) query = query.eq('studio_id', studioId);

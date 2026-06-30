@@ -5,7 +5,7 @@ import { appShell, pageHeader } from '../components/layout';
 import { listMonthStays, listStudios } from '../services/repositories';
 import { navigate, state } from '../state/app-state';
 import { Stay, MonthRef, Studio } from '../types';
-import { addMonths, calculateNights, currentMonthRef, monthBounds, monthLabel, weekday } from '../utils/date';
+import { addMonths, calculateNights, currentMonthRef, monthLabel, weekday } from '../utils/date';
 import { brl } from '../utils/format';
 
 let ref: MonthRef = currentMonthRef();
@@ -14,16 +14,19 @@ let studios: Studio[] = [];
 let selectedStudioId = '';
 
 function overlapNightsInMonth(stay: Stay, current: MonthRef) {
-  const { start, end } = monthBounds(current);
-  const toUtc = (value: string) => {
-    const [year, month, day] = value.slice(0, 10).split('-').map(Number);
-    return Date.UTC(year, month - 1, day);
+  const toLocalCalendarDay = (value: string) => {
+    const date = new Date(value);
+    return Date.UTC(date.getFullYear(), date.getMonth(), date.getDate());
   };
-  const monthStart = toUtc(start);
-  const monthEndExclusive = toUtc(end) + 86_400_000;
-  const overlapStart = Math.max(toUtc(stay.check_in_at), monthStart);
-  const overlapEnd = Math.min(toUtc(stay.check_out_at), monthEndExclusive);
-  return Math.max(0, Math.round((overlapEnd - overlapStart) / 86_400_000));
+  const monthStart = Date.UTC(current.year, current.month - 1, 1);
+  const nextMonthStart = Date.UTC(current.year, current.month, 1);
+  const stayStart = toLocalCalendarDay(stay.check_in_at);
+  const stayEnd = toLocalCalendarDay(stay.check_out_at);
+  const overlapStart = Math.max(stayStart, monthStart);
+  const overlapEnd = Math.min(stayEnd, nextMonthStart);
+
+  // A saída é exclusiva: 30/05 a 02/06 conta 30 e 31 em maio e 01 em junho.
+  return Math.max(0, (overlapEnd - overlapStart) / 86_400_000);
 }
 
 function amountInMonth(stay: Stay, amount: number | null | undefined, current: MonthRef) {
@@ -42,11 +45,12 @@ export async function renderDashboard() {
     selectedStudioId = '';
     stays = await listMonthStays(state.company.id, ref.year, ref.month);
   }
-  const reservations = stays.length;
   const total = stays.reduce((sum, stay) => sum + amountInMonth(stay, stay.total_amount, ref), 0);
   const fees = stays.reduce((sum, stay) => sum + amountInMonth(stay, stay.fees_amount, ref), 0);
   const net = stays.reduce((sum, stay) => sum + amountInMonth(stay, stay.net_amount, ref), 0);
-  const nights = stays.reduce((sum, stay) => sum + overlapNightsInMonth(stay, ref), 0);
+  const nights = stays
+    .filter((stay) => stay.reservation_status !== 'Cancelado')
+    .reduce((sum, stay) => sum + overlapNightsInMonth(stay, ref), 0);
   const taxableTotal = stays
     .filter((stay) => stay.platforms?.name !== 'Particular')
     .reduce((sum, stay) => sum + amountInMonth(stay, stay.total_amount, ref), 0);
@@ -72,7 +76,7 @@ export async function renderDashboard() {
       ${card('Lucro líquido do mês', brl(net))}
       ${card('Imposto previsto', brl(tax))}
       ${card('Rendimentos isentos', brl(exempt))}
-      ${card('Quantidade de reservas', String(reservations))}
+      ${card('Quantidade de diárias', String(nights))}
       ${card('Taxa média diária', brl(dailyAverage))}
     </section>
     <section class="panel">
