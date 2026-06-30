@@ -200,7 +200,9 @@ export function bindHospedagens(refresh: () => void) {
     location.hash = `/hospedagens?${params.toString()}`;
   });
   document.querySelectorAll<HTMLButtonElement>('[data-edit]').forEach((button) => button.addEventListener('click', () => {
-    location.hash = `/hospedagens?id=${button.dataset.edit}`;
+    const params = new URLSearchParams(state.route.split('?')[1] ?? '');
+    params.set('id', button.dataset.edit!);
+    location.hash = `/hospedagens?${params.toString()}`;
   }));
   document.querySelectorAll<HTMLButtonElement>('[data-delete]').forEach((button) => button.addEventListener('click', async () => {
     try {
