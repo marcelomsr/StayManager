@@ -30,8 +30,15 @@ const converterStringParaNumero = (valor: any): number => {
 const formatDateTime = (value: string) => {
   if (!value) return '';
   const date = new Date(value);
-  return date.toLocaleString('pt-BR', { dateStyle: 'short', timeStyle: 'short' });
+  const datePart = date.toLocaleDateString('pt-BR');
+  const timePart = date.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' });
+  return `${datePart} ${timePart}`;
 };
+
+const localDateInput = (date: Date) =>
+  `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}`;
+
+const shortWeekday = (value: string) => weekday(value).replace(/-feira$/, '');
 
 // Função auxiliar para anexar o fuso horário local e evitar perda de horas
 const formatarISOComFusoLocal = (dateTimeStr: string): string => {
@@ -56,6 +63,16 @@ export async function renderHospedagens() {
   if (!state.company) return appShell('');
   const params = new URLSearchParams(state.route.split('?')[1] ?? '');
   const filters = Object.fromEntries(params.entries());
+  if (!filters.start) {
+    const sevenDaysAgo = new Date();
+    sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7);
+    filters.start = localDateInput(sevenDaysAgo);
+  }
+  if (!filters.end) {
+    const tenDaysFromNow = new Date();
+    tenDaysFromNow.setDate(tenDaysFromNow.getDate() + 10);
+    filters.end = localDateInput(tenDaysFromNow);
+  }
   [studios, platforms, stays] = await Promise.all([listStudios(state.company.id), listPlatforms(state.company.id), listStays(state.company.id, filters)]);
   const edit = stays.find((stay) => stay.id === params.get('id'));
   return appShell(`
@@ -74,28 +91,36 @@ export async function renderHospedagens() {
     </section>
     <section class="split wide-left">
       ${stayForm(edit)}
-      <section class="panel table-wrap">
+      <section class="panel table-wrap stays-table">
         <table>
-          <thead><tr><th>Entrada</th><th>Saída</th><th>Dia da saída</th><th>Studio</th><th>Hóspedes</th><th>Diárias</th><th>Plataforma</th><th>Status</th><th>Total</th><th>Taxas</th><th>Líquido</th><th>Diária</th><th></th></tr></thead>
+          <thead><tr><th>Entrada</th><th>Saída</th><th>Dia da saída</th><th>Studio</th><th>Hóspedes</th><th>Diárias</th><th>Plataforma</th><th>Status</th><th>Pagamento</th><th>Total</th><th>Taxas</th><th>Líquido</th><th>Diária</th><th></th></tr></thead>
           <tbody>${stays.map((stay) => `
             <tr class="${isWithinNextDays(stay.check_in_at, 7) ? 'upcoming' : ''}">
               <td>${formatDateTime(stay.check_in_at)}</td>
               <td>${formatDateTime(stay.check_out_at)}</td>
-              <td>${weekday(stay.check_out_at)}</td>
-              <td>${escapeHtml(stay.studios?.name)}</td>
+              <td>${shortWeekday(stay.check_out_at)}</td>
+              <td><span class="stay-studio-cell">${escapeHtml(stay.studios?.name)}${stay.car_info?.trim() ? `<button type="button" class="car-info-button" data-car="${stay.id}" aria-label="Ver informações do veículo" title="Ver informações do veículo">
+                <svg aria-hidden="true" viewBox="0 0 24 24"><path d="M5 11 6.5 7h11l1.5 4m-14 0h14a2 2 0 0 1 2 2v4h-2v2h-2v-2H7v2H5v-2H3v-4a2 2 0 0 1 2-2Zm2.5 3a1.5 1.5 0 1 0 0 3 1.5 1.5 0 0 0 0-3Zm9 0a1.5 1.5 0 1 0 0 3 1.5 1.5 0 0 0 0-3Z"/></svg>
+              </button>` : ''}</span></td>
               <td>${escapeHtml(stay.guests_names)}</td>
               <td>${stay.nights_count}</td>
               <td>${badge(stay.platforms?.name ?? '', stay.platforms?.color)}</td>
               <td>${badge(stay.reservation_status, RESERVATION_STATUS_OPTIONS.find((item) => item.name === stay.reservation_status)?.color)}</td>
+              <td>${badge(stay.payment_status, PAYMENT_STATUS_OPTIONS.find((item) => item.name === stay.payment_status)?.color)}</td>
               <td>${brl(stay.total_amount)}</td>
               <td>${brl(stay.fees_amount)}</td>
               <td>${brl(stay.net_amount)}</td>
               <td>${brl(stay.daily_amount)}</td>
-              <td class="row-actions"><button data-edit="${stay.id}">Editar</button><button class="danger" data-delete="${stay.id}">Excluir</button></td>
+              <td class="row-actions"><div><button data-edit="${stay.id}">Editar</button><button class="danger" data-delete="${stay.id}">Excluir</button></div></td>
             </tr>`).join('')}</tbody>
         </table>
       </section>
     </section>
+    <dialog id="car-info-dialog" class="car-info-dialog">
+      <h2>Informações do veículo</h2>
+      <p id="car-info-content"></p>
+      <form method="dialog"><button>Fechar</button></form>
+    </dialog>
   `);
 }
 
@@ -125,6 +150,7 @@ function stayForm(stay?: Stay) {
 
   const checkInValue = stay ? toDateTimeInput(stay.check_in_at) : defaultCheckInTime();
   const checkOutValue = stay ? toDateTimeInput(stay.check_out_at) : defaultCheckOutTime();
+  const reservationDateValue = stay ? toDateInput(stay.reservation_date) : localDateInput(new Date());
   const nightsValue = stay ? stay.nights_count : 1;
 
   // CONDICIONAL: Verifica se a hospedagem atual está com status cancelado para liberar a edição visual logo de início
@@ -141,12 +167,12 @@ function stayForm(stay?: Stay) {
       <label>Saída <input type="datetime-local" name="check_out_at" value="${checkOutValue}" required /></label>
       <label>Hóspedes <textarea name="guests_names" required>${escapeHtml(stay?.guests_names)}</textarea></label>
       <label>Qtd. hóspedes <input type="number" min="1" name="guests_count" value="${stay?.guests_count ?? 1}" /></label>
-      <label>Data reserva <input type="date" name="reservation_date" value="${toDateInput(stay?.reservation_date)}" required /></label>
+      <label>Data reserva <input type="date" name="reservation_date" value="${reservationDateValue}" required /></label>
       <label>Qtd. diárias <input type="number" min="0" name="nights_count" value="${nightsValue}" /></label>
       <label>Plataforma <select name="platform_id" required>${platforms.map((item) => `<option value="${item.id}" ${stay?.platform_id === item.id ? 'selected' : ''}>${escapeHtml(item.name)}</option>`).join('')}</select></label>
       <label>Status reserva <select name="reservation_status">${RESERVATION_STATUS_OPTIONS.map((item) => `<option ${stay?.reservation_status === item.name ? 'selected' : ''}>${item.name}</option>`).join('')}</select></label>
       <label>Observação <textarea name="notes">${escapeHtml(stay?.notes)}</textarea></label>
-      <label class="garage-field ${studio?.has_garage ? '' : 'hidden'}">Informações do carro <textarea name="car_info">${escapeHtml(stay?.car_info)}</textarea></label>
+      <label class="garage-field ${studio?.has_garage ? '' : 'hidden'}">Informações do carro <input type="text" name="car_info" value="${escapeHtml(stay?.car_info)}" /></label>
       <label>Valor total <input name="total_amount" inputmode="decimal" value="${formatarMoedaInput(stay?.total_amount ?? 0)}" /></label>
       <label>Taxas <input name="fees_amount" inputmode="decimal" value="${formatarMoedaInput(stay?.fees_amount ?? 0)}" /></label>
       <label>Valor líquido <input name="net_amount" inputmode="decimal" value="${formatarMoedaInput(stay?.net_amount)}" ${readonlyAttr} style="${backgroundStyle}" /></label>
@@ -183,6 +209,14 @@ export function bindHospedagens(refresh: () => void) {
     } catch (error) {
       toast(error instanceof Error ? error.message : 'Erro ao excluir hospedagem.', 'error');
     }
+  }));
+  const carInfoDialog = qs<HTMLDialogElement>('#car-info-dialog');
+  const carInfoContent = qs<HTMLElement>('#car-info-content');
+  document.querySelectorAll<HTMLButtonElement>('[data-car]').forEach((button) => button.addEventListener('click', () => {
+    const stay = stays.find((item) => item.id === button.dataset.car);
+    if (!stay?.car_info || !carInfoDialog || !carInfoContent) return;
+    carInfoContent.textContent = stay.car_info;
+    carInfoDialog.showModal();
   }));
 
   qs<HTMLButtonElement>('#cancel-edit')?.addEventListener('click', () => {
