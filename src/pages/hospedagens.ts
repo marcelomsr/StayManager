@@ -119,7 +119,11 @@ export async function renderHospedagens() {
     <dialog id="car-info-dialog" class="car-info-dialog">
       <h2>Informações do veículo</h2>
       <p id="car-info-content"></p>
-      <form method="dialog"><button>Fechar</button></form>
+      <p id="car-info-plate-error" class="car-info-plate-error" hidden>Não foi possível identificar a placa.</p>
+      <form method="dialog">
+        <button type="button" id="copy-car-plate">Copiar placa</button>
+        <button>Fechar</button>
+      </form>
     </dialog>
   `);
 }
@@ -214,12 +218,30 @@ export function bindHospedagens(refresh: () => void) {
   }));
   const carInfoDialog = qs<HTMLDialogElement>('#car-info-dialog');
   const carInfoContent = qs<HTMLElement>('#car-info-content');
+  const copyCarPlateButton = qs<HTMLButtonElement>('#copy-car-plate');
+  const carInfoPlateError = qs<HTMLElement>('#car-info-plate-error');
+  let currentCarPlate: string | null = null;
+
   document.querySelectorAll<HTMLButtonElement>('[data-car]').forEach((button) => button.addEventListener('click', () => {
     const stay = stays.find((item) => item.id === button.dataset.car);
-    if (!stay?.car_info || !carInfoDialog || !carInfoContent) return;
+    if (!stay?.car_info || !carInfoDialog || !carInfoContent || !copyCarPlateButton || !carInfoPlateError) return;
+    const carInfoParts = stay.car_info.split(' - ');
+    currentCarPlate = carInfoParts.length >= 3 ? carInfoParts[1].trim() || null : null;
     carInfoContent.textContent = stay.car_info;
+    copyCarPlateButton.textContent = currentCarPlate ? `Copiar placa ${currentCarPlate}` : 'Copiar placa';
+    copyCarPlateButton.disabled = !currentCarPlate;
+    carInfoPlateError.hidden = Boolean(currentCarPlate);
     carInfoDialog.showModal();
   }));
+  copyCarPlateButton?.addEventListener('click', async () => {
+    if (!currentCarPlate) return;
+    try {
+      await navigator.clipboard.writeText(currentCarPlate);
+      toast('Placa copiada.');
+    } catch {
+      toast('Não foi possível copiar a placa.', 'error');
+    }
+  });
 
   qs<HTMLButtonElement>('#cancel-edit')?.addEventListener('click', () => {
     location.hash = '/hospedagens';
