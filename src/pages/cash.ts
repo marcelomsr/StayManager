@@ -116,7 +116,10 @@ export function bindCash(refresh: () => void) {
       (form.elements.namedItem('kind') as HTMLSelectElement).value = entry.kind;
       (form.elements.namedItem('entry_date') as HTMLInputElement).value = entryDate;
       (form.elements.namedItem('description') as HTMLInputElement).value = entry.description;
-      (form.elements.namedItem('amount') as HTMLInputElement).value = String(entry.amount);
+      (form.elements.namedItem('amount') as HTMLInputElement).value = Number(entry.amount).toLocaleString('pt-BR', {
+        minimumFractionDigits: 2,
+        maximumFractionDigits: 2
+      });
       if (submitButton) submitButton.textContent = 'Salvar alteração';
     });
   });
