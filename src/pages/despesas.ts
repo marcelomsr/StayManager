@@ -210,7 +210,10 @@ export function bindDespesas(refresh: () => void) {
     syncExpenseTypeOptions(entry.studio_id);
     expenseTypeSelect!.value = entry.expense_type_id;
     (form.elements.namedItem('payment_status') as HTMLSelectElement).value = entry.payment_status ?? 'Não pago';
-    (form.elements.namedItem('amount') as HTMLInputElement).value = String(entry.amount);
+    (form.elements.namedItem('amount') as HTMLInputElement).value = Number(entry.amount).toLocaleString('pt-BR', {
+      minimumFractionDigits: 2,
+      maximumFractionDigits: 2
+    });
     (form.elements.namedItem('notes') as HTMLTextAreaElement).value = entry.notes ?? '';
     submitButton!.textContent = 'Salvar alteração';
   }));
