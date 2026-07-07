@@ -349,6 +349,7 @@ drop policy if exists "anon_delete_expense_entries" on public.expense_entries;
 drop policy if exists "anon_select_cash_entries" on public.cash_entries;
 drop policy if exists "anon_insert_cash_entries" on public.cash_entries;
 drop policy if exists "anon_update_cash_entries" on public.cash_entries;
+drop policy if exists "anon_delete_cash_entries" on public.cash_entries;
 drop policy if exists "anon_select_notes" on public.notes;
 drop policy if exists "anon_insert_notes" on public.notes;
 drop policy if exists "anon_update_notes" on public.notes;
@@ -394,6 +395,7 @@ create policy "anon_delete_expense_entries" on public.expense_entries for delete
 create policy "anon_select_cash_entries" on public.cash_entries for select to anon using (true);
 create policy "anon_insert_cash_entries" on public.cash_entries for insert to anon with check (true);
 create policy "anon_update_cash_entries" on public.cash_entries for update to anon using (true) with check (true);
+create policy "anon_delete_cash_entries" on public.cash_entries for delete to anon using (true);
 
 create policy "anon_select_notes" on public.notes for select to anon using (true);
 create policy "anon_insert_notes" on public.notes for insert to anon with check (true);
