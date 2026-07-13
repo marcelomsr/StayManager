@@ -4,8 +4,8 @@ import { appShell, pageHeader } from '../components/layout';
 import { listCashEntries, saveCashEntry, deleteCashEntry } from '../services/repositories';
 import { state, isCompanyActive } from '../state/app-state';
 import { CashEntry, MonthRef } from '../types';
-import { addMonths, currentMonthRef, monthLabel } from '../utils/date';
-import { brl, numberValue } from '../utils/format';
+import { addMonths, currentMonthRef, monthLabel, pad } from '../utils/date';
+import { brl, sumExpressionValue } from '../utils/format';
 
 const formatDate = (value: string) => {
   if (!value) return '';
@@ -16,6 +16,11 @@ const formatDate = (value: string) => {
 
 const capitalizeKind = (kind: string) => {
   return kind.charAt(0).toUpperCase() + kind.slice(1);
+};
+
+const todayDateInput = () => {
+  const now = new Date();
+  return `${now.getFullYear()}-${pad(now.getMonth() + 1)}-${pad(now.getDate())}`;
 };
 
 let ref: MonthRef = currentMonthRef();
@@ -57,7 +62,7 @@ export async function renderCash() {
       <form id="cash-form" class="panel form-grid">
         <input type="hidden" name="id" />
         <label>Tipo <select name="kind"><option value="entrada">Entrada</option><option value="saida">Saída</option></select></label>
-        <label>Data <input type="date" name="entry_date" required /></label>
+        <label>Data <input type="date" name="entry_date" value="${todayDateInput()}" required /></label>
         <label>Descrição <input name="description" list="cash-descriptions" required /></label>
         <datalist id="cash-descriptions">${CASH_DESCRIPTIONS.map((item) => `<option value="${escapeHtml(item)}"></option>`).join('')}</datalist>
         <label>Valor <input name="amount" inputmode="decimal" required /></label>
@@ -82,6 +87,14 @@ export function bindCash(refresh: () => void) {
   qs<HTMLButtonElement>('#next-month')?.addEventListener('click', () => { ref = addMonths(ref, 1); refresh(); });
   const form = qs<HTMLFormElement>('#cash-form')!;
   const submitButton = qs<HTMLButtonElement>('#cash-submit');
+  const amountInput = form.elements.namedItem('amount') as HTMLInputElement;
+
+  amountInput.addEventListener('keydown', (event: KeyboardEvent) => {
+    if (event.ctrlKey || event.metaKey || event.altKey) return;
+    if (event.key.length === 1 && !/[\d,+]/.test(event.key)) {
+      event.preventDefault();
+    }
+  });
 
   qs<HTMLFormElement>('#cash-form')?.addEventListener('submit', async (event) => {
     event.preventDefault();
@@ -92,13 +105,19 @@ export function bindCash(refresh: () => void) {
     }
     
     const data = new FormData(event.currentTarget as HTMLFormElement);
+    const amount = sumExpressionValue(data.get('amount'));
+    if (Number.isNaN(amount)) {
+      toast('Informe o valor usando apenas numeros, virgula decimal e +.', 'error');
+      return;
+    }
+
     try {
       await saveCashEntry(state.company!.id, {
         id: String(data.get('id') || '') || undefined,
         kind: data.get('kind') as 'entrada' | 'saida',
         entry_date: String(data.get('entry_date')),
         description: String(data.get('description')),
-        amount: numberValue(data.get('amount'))
+        amount
       });
       toast(data.get('id') ? 'Lançamento atualizado.' : 'Lançamento salvo.');
       refresh();
