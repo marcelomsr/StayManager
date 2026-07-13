@@ -4,7 +4,7 @@ import { listExpenseEntries, listExpenseTypes, listMonthStays, listStudios, save
 import { state, isCompanyActive } from '../state/app-state';
 import { ExpenseEntry, ExpenseType, Id, MonthRef, Studio, Stay } from '../types';
 import { addMonths, currentMonthRef, monthBounds, monthLabel, pad } from '../utils/date';
-import { brl, numberValue } from '../utils/format';
+import { brl, sumExpressionValue } from '../utils/format';
 
 let ref: MonthRef = currentMonthRef();
 let selectedStudioId: Id = '';
@@ -140,6 +140,14 @@ export function bindDespesas(refresh: () => void) {
 
   syncExpenseTypeOptions(studioSelect?.value ?? '');
 
+  const amountInput = form.elements.namedItem('amount') as HTMLInputElement;
+  amountInput.addEventListener('keydown', (event: KeyboardEvent) => {
+    if (event.ctrlKey || event.metaKey || event.altKey) return;
+    if (event.key.length === 1 && !/[\d,+]/.test(event.key)) {
+      event.preventDefault();
+    }
+  });
+
   qs<HTMLFormElement>('#expense-type-form')?.addEventListener('submit', async (event) => {
     event.preventDefault();
     
@@ -183,6 +191,12 @@ export function bindDespesas(refresh: () => void) {
       return;
     }
 
+    const amount = sumExpressionValue(data.get('amount'));
+    if (Number.isNaN(amount)) {
+      toast('Informe o valor usando apenas numeros, virgula decimal e +.', 'error');
+      return;
+    }
+
     try {
       await saveExpenseEntry(state.company!.id, {
         id: String(data.get('id') || '') || undefined,
@@ -190,7 +204,7 @@ export function bindDespesas(refresh: () => void) {
         expense_type_id: expenseTypeId,
         payment_status: String(data.get('payment_status') || 'Não pago'),
         reference_month: `${ref.year}-${pad(ref.month)}-01`,
-        amount: numberValue(data.get('amount')),
+        amount,
         notes: String(data.get('notes') || '') || null
       });
 
@@ -212,7 +226,8 @@ export function bindDespesas(refresh: () => void) {
     (form.elements.namedItem('payment_status') as HTMLSelectElement).value = entry.payment_status ?? 'Não pago';
     (form.elements.namedItem('amount') as HTMLInputElement).value = Number(entry.amount).toLocaleString('pt-BR', {
       minimumFractionDigits: 2,
-      maximumFractionDigits: 2
+      maximumFractionDigits: 2,
+      useGrouping: false
     });
     (form.elements.namedItem('notes') as HTMLTextAreaElement).value = entry.notes ?? '';
     submitButton!.textContent = 'Salvar alteração';

@@ -5,7 +5,7 @@ import { listPlatforms, listStays, listStudios, saveStay, softDelete } from '../
 import { state, isCompanyActive } from '../state/app-state';
 import { Platform, Stay, Studio } from '../types';
 import { calculateNights, isWithinNextDays, pad, toDateInput, toDateTimeInput, weekday } from '../utils/date';
-import { brl, numberValue, optionalNumberValue } from '../utils/format';
+import { brl, sumExpressionValue } from '../utils/format';
 
 let stays: Stay[] = [];
 let studios: Studio[] = [];
@@ -14,7 +14,7 @@ let platforms: Platform[] = [];
 // Função auxiliar local para formatar valores numéricos no padrão pt-BR para os inputs
 const formatarMoedaInput = (valor: number | null | undefined): string => {
   if (valor === null || valor === undefined || isNaN(valor)) return '';
-  return new Intl.NumberFormat('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(valor);
+  return new Intl.NumberFormat('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2, useGrouping: false }).format(valor);
 };
 
 // Função auxiliar para converter string pt-BR (195,67) em número JS válido (195.67)
@@ -261,7 +261,7 @@ export function bindHospedagens(refresh: () => void) {
     }
     
     const total = converterStringParaNumero((form.total_amount as HTMLInputElement).value);
-    const fees = converterStringParaNumero((form.fees_amount as HTMLInputElement).value);
+    const fees = sumExpressionValue((form.fees_amount as HTMLInputElement).value);
     
     // REGRA DE CÁLCULO AUTO: Só calcula o líquido automaticamente se o status NÃO for Cancelado, ou se for cancelado e o campo estiver vazio
     const netInput = form.net_amount as HTMLInputElement;
@@ -316,6 +316,12 @@ export function bindHospedagens(refresh: () => void) {
       });
     }
   });
+  (form.fees_amount as HTMLInputElement).addEventListener('keydown', (event: KeyboardEvent) => {
+    if (event.ctrlKey || event.metaKey || event.altKey) return;
+    if (event.key.length === 1 && !/[\d,+]/.test(event.key)) {
+      event.preventDefault();
+    }
+  });
 
   form.addEventListener('submit', async (event) => {
     event.preventDefault();
@@ -349,7 +355,11 @@ export function bindHospedagens(refresh: () => void) {
     }
 
     const total_amount = converterStringParaNumero((form.total_amount as HTMLInputElement).value);
-    const fees_amount = converterStringParaNumero((form.fees_amount as HTMLInputElement).value);
+    const fees_amount = sumExpressionValue((form.fees_amount as HTMLInputElement).value);
+    if (Number.isNaN(fees_amount)) {
+      toast('Informe taxas usando apenas numeros, virgula decimal e +.', 'error');
+      return;
+    }
     
     // Captura o valor líquido de forma dinâmica (seja calculado ou digitado no caso do Cancelado)
     const net_amount = converterStringParaNumero((form.net_amount as HTMLInputElement).value);
