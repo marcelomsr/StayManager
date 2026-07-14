@@ -250,6 +250,19 @@ export function bindHospedagens(refresh: () => void) {
   const form = qs<HTMLFormElement>('#stay-form');
   if (!form) return;
 
+  const updateCheckOutFromCheckIn = () => {
+    const checkInInput = form.check_in_at as HTMLInputElement;
+    const checkOutInput = form.check_out_at as HTMLInputElement;
+    if (!checkInInput.value) return;
+
+    const checkIn = new Date(checkInInput.value);
+    if (Number.isNaN(checkIn.getTime())) return;
+
+    const checkOutTime = checkOutInput.value.slice(11) || '11:00';
+    checkIn.setDate(checkIn.getDate() + 1);
+    checkOutInput.value = `${localDateInput(checkIn)}T${checkOutTime}`;
+  };
+
   const recalc = () => {
     const checkIn = (form.check_in_at as HTMLInputElement).value;
     const checkOut = (form.check_out_at as HTMLInputElement).value;
@@ -281,7 +294,11 @@ export function bindHospedagens(refresh: () => void) {
     }
   };
   
-  ['check_in_at', 'check_out_at', 'total_amount', 'fees_amount', 'nights_count'].forEach((name) => form[name].addEventListener('input', recalc));
+  form.check_in_at.addEventListener('input', () => {
+    updateCheckOutFromCheckIn();
+    recalc();
+  });
+  ['check_out_at', 'total_amount', 'fees_amount', 'nights_count'].forEach((name) => form[name].addEventListener('input', recalc));
   form.nights_count.addEventListener('input', () => (form.nights_count.dataset.manual = 'true'));
   
   // OUVINTE DINÂMICO: Se mudar o select de status em tempo real, bloqueia ou desbloqueia o campo líquido
