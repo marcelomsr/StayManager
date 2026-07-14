@@ -178,7 +178,7 @@ function stayForm(stay?: Stay) {
       <label>Observação <textarea name="notes">${escapeHtml(stay?.notes)}</textarea></label>
       <label class="garage-field ${studio?.has_garage ? '' : 'hidden'}">Informações do carro <input type="text" name="car_info" value="${escapeHtml(stay?.car_info)}" /></label>
       <label>Valor total <input name="total_amount" inputmode="decimal" value="${formatarMoedaInput(stay?.total_amount ?? 0)}" /></label>
-      <label>Taxas <input name="fees_amount" inputmode="decimal" value="${formatarMoedaInput(stay?.fees_amount ?? 0)}" /></label>
+      <label>Taxas <input name="fees_amount" inputmode="text" value="${formatarMoedaInput(stay?.fees_amount ?? 0)}" /></label>
       <label>Valor líquido <input name="net_amount" inputmode="decimal" value="${formatarMoedaInput(stay?.net_amount)}" ${readonlyAttr} style="${backgroundStyle}" /></label>
       <label>Valor diária <input name="daily_amount" inputmode="decimal" value="${formatarMoedaInput(stay?.daily_amount)}" readonly style="background-color: #f1f3f5; cursor: not-allowed;" /></label>
       <label>Status pagamento <select name="payment_status">${PAYMENT_STATUS_OPTIONS.map((item) => `<option ${stay?.payment_status === item.name ? 'selected' : ''}>${item.name}</option>`).join('')}</select></label>

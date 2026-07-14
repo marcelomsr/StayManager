@@ -65,7 +65,7 @@ export async function renderCash() {
         <label>Data <input type="date" name="entry_date" value="${todayDateInput()}" required /></label>
         <label>Descrição <input name="description" list="cash-descriptions" required /></label>
         <datalist id="cash-descriptions">${CASH_DESCRIPTIONS.map((item) => `<option value="${escapeHtml(item)}"></option>`).join('')}</datalist>
-        <label>Valor <input name="amount" inputmode="decimal" required /></label>
+        <label>Valor <input name="amount" inputmode="text" required /></label>
         <button id="cash-submit" class="primary">Salvar</button>
       </form>
       <div class="stacked-panels">

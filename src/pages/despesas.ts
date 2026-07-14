@@ -99,7 +99,7 @@ export async function renderDespesas() {
         <label>Studio <select id="expense-entry-studio" name="studio_id">${studios.map((studio) => `<option value="${studio.id}">${escapeHtml(studio.name)}</option>`).join('')}</select></label>
         <label>Tipo <select id="expense-entry-type" name="expense_type_id">${renderExpenseTypeOptions(defaultStudioId)}</select></label>
         <label>Pagamento <select name="payment_status">${EXPENSE_PAYMENT_STATUS_OPTIONS.map((item) => `<option value="${item.name}">${item.name}</option>`).join('')}</select></label>
-        <label>Valor <input name="amount" inputmode="decimal" required /></label>
+        <label>Valor <input name="amount" inputmode="text" required /></label>
         <label>Observação <textarea name="notes"></textarea></label>
         <button id="expense-entry-submit" class="primary">Lançar gasto</button>
       </form>
