@@ -108,6 +108,25 @@ export async function saveStay(companyId: Id, values: Partial<Stay>) {
   if (error) throw error;
 }
 
+export async function updateStayInline(companyId: Id, stay: Stay, values: Pick<Partial<Stay>, 'reservation_status' | 'payment_status'>) {
+  companyRequired(companyId);
+  const nextReservationStatus = values.reservation_status ?? stay.reservation_status;
+  if (nextReservationStatus !== 'Cancelado') {
+    const conflict = await hasStayConflict(companyId, stay.studio_id, stay.check_in_at, stay.check_out_at, stay.id);
+    if (conflict) throw new Error('Já existe uma hospedagem com período sobreposto para este studio.');
+  }
+
+  const { data, error } = await supabase
+    .from('stays')
+    .update(values)
+    .eq('id', stay.id)
+    .eq('company_id', companyId)
+    .select('*,studios(*),platforms(*)')
+    .single();
+  if (error) throw error;
+  return data as Stay;
+}
+
 export async function listExpenseTypes(companyId: Id) {
   const { data, error } = await supabase.rpc('expense_types_with_studios', { p_company_id: companyId });
   if (error) throw error;

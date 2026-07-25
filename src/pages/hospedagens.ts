@@ -1,7 +1,7 @@
 import { PAYMENT_STATUS_OPTIONS, RESERVATION_STATUS_OPTIONS } from '../config';
 import { escapeHtml, qs, toast } from '../components/dom';
 import { appShell, pageHeader } from '../components/layout';
-import { listPlatforms, listStays, listStudios, saveStay, softDelete } from '../services/repositories';
+import { listPlatforms, listStays, listStudios, saveStay, softDelete, updateStayInline } from '../services/repositories';
 import { state, isCompanyActive } from '../state/app-state';
 import { Platform, Stay, Studio } from '../types';
 import { calculateNights, isWithinNextDays, pad, toDateInput, toDateTimeInput, weekday } from '../utils/date';
@@ -10,6 +10,7 @@ import { brl, sumExpressionValue } from '../utils/format';
 let stays: Stay[] = [];
 let studios: Studio[] = [];
 let platforms: Platform[] = [];
+const updatingInlineFields = new Set<string>();
 
 // Função auxiliar local para formatar valores numéricos no padrão pt-BR para os inputs
 const formatarMoedaInput = (valor: number | null | undefined): string => {
@@ -39,6 +40,44 @@ const localDateInput = (date: Date) =>
   `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}`;
 
 const shortWeekday = (value: string) => weekday(value).replace(/-feira$/, '');
+
+type InlineStayField = 'reservation_status' | 'payment_status';
+
+const nextOptionName = (currentValue: string, options: readonly { name: string }[]) => {
+  const currentIndex = options.findIndex((item) => item.name === currentValue);
+  const nextIndex = currentIndex >= 0 ? (currentIndex + 1) % options.length : 0;
+  return options[nextIndex]?.name ?? currentValue;
+};
+
+const statusColor = (value: string) => RESERVATION_STATUS_OPTIONS.find((item) => item.name === value)?.color;
+const paymentColor = (value: string) => PAYMENT_STATUS_OPTIONS.find((item) => item.name === value)?.color;
+
+const editableBadge = (stay: Stay, field: InlineStayField) => {
+  const value = stay[field];
+  const color = field === 'reservation_status' ? statusColor(value) : paymentColor(value);
+  const isUpdating = updatingInlineFields.has(`${stay.id}:${field}`);
+  return `<button type="button" class="badge-button" data-cycle-field="${field}" data-stay-id="${stay.id}" ${isUpdating ? 'disabled aria-busy="true"' : ''}>${badge(value, color)}</button>`;
+};
+
+const renderStayRow = (stay: Stay) => `
+  <tr class="${isWithinNextDays(stay.check_in_at, 7) ? 'upcoming' : ''}" data-stay-row="${stay.id}">
+    <td>${formatDateTime(stay.check_in_at)}</td>
+    <td>${formatDateTime(stay.check_out_at)}</td>
+    <td>${shortWeekday(stay.check_out_at)}</td>
+    <td><span class="stay-studio-cell">${escapeHtml(stay.studios?.name)}${stay.car_info?.trim() ? `<button type="button" class="car-info-button" data-car="${stay.id}" aria-label="Ver informações do veículo" title="Ver informações do veículo">
+      <svg aria-hidden="true" viewBox="0 0 24 24"><path d="M5 11 6.5 7h11l1.5 4m-14 0h14a2 2 0 0 1 2 2v4h-2v2h-2v-2H7v2H5v-2H3v-4a2 2 0 0 1 2-2Zm2.5 3a1.5 1.5 0 1 0 0 3 1.5 1.5 0 0 0 0-3Zm9 0a1.5 1.5 0 1 0 0 3 1.5 1.5 0 0 0 0-3Z"/></svg>
+    </button>` : ''}</span></td>
+    <td>${escapeHtml(stay.guests_names)}</td>
+    <td>${stay.nights_count}</td>
+    <td>${badge(stay.platforms?.name ?? '', stay.platforms?.color)}</td>
+    <td>${editableBadge(stay, 'reservation_status')}</td>
+    <td>${editableBadge(stay, 'payment_status')}</td>
+    <td>${brl(stay.total_amount)}</td>
+    <td>${brl(stay.fees_amount)}</td>
+    <td>${brl(stay.net_amount)}</td>
+    <td>${brl(stay.daily_amount)}</td>
+    <td class="row-actions"><div><button data-edit="${stay.id}">Editar</button><button class="danger" data-delete="${stay.id}">Excluir</button></div></td>
+  </tr>`;
 
 // Função auxiliar para anexar o fuso horário local e evitar perda de horas
 const formatarISOComFusoLocal = (dateTimeStr: string): string => {
@@ -94,25 +133,7 @@ export async function renderHospedagens() {
       <section class="panel table-wrap stays-table">
         <table>
           <thead><tr><th>Entrada</th><th>Saída</th><th>Dia da saída</th><th>Studio</th><th>Hóspedes</th><th>Diárias</th><th>Plataforma</th><th>Status</th><th>Pagamento</th><th>Total</th><th>Taxas</th><th>Líquido</th><th>Diária</th><th></th></tr></thead>
-          <tbody>${stays.map((stay) => `
-            <tr class="${isWithinNextDays(stay.check_in_at, 7) ? 'upcoming' : ''}">
-              <td>${formatDateTime(stay.check_in_at)}</td>
-              <td>${formatDateTime(stay.check_out_at)}</td>
-              <td>${shortWeekday(stay.check_out_at)}</td>
-              <td><span class="stay-studio-cell">${escapeHtml(stay.studios?.name)}${stay.car_info?.trim() ? `<button type="button" class="car-info-button" data-car="${stay.id}" aria-label="Ver informações do veículo" title="Ver informações do veículo">
-                <svg aria-hidden="true" viewBox="0 0 24 24"><path d="M5 11 6.5 7h11l1.5 4m-14 0h14a2 2 0 0 1 2 2v4h-2v2h-2v-2H7v2H5v-2H3v-4a2 2 0 0 1 2-2Zm2.5 3a1.5 1.5 0 1 0 0 3 1.5 1.5 0 0 0 0-3Zm9 0a1.5 1.5 0 1 0 0 3 1.5 1.5 0 0 0 0-3Z"/></svg>
-              </button>` : ''}</span></td>
-              <td>${escapeHtml(stay.guests_names)}</td>
-              <td>${stay.nights_count}</td>
-              <td>${badge(stay.platforms?.name ?? '', stay.platforms?.color)}</td>
-              <td>${badge(stay.reservation_status, RESERVATION_STATUS_OPTIONS.find((item) => item.name === stay.reservation_status)?.color)}</td>
-              <td>${badge(stay.payment_status, PAYMENT_STATUS_OPTIONS.find((item) => item.name === stay.payment_status)?.color)}</td>
-              <td>${brl(stay.total_amount)}</td>
-              <td>${brl(stay.fees_amount)}</td>
-              <td>${brl(stay.net_amount)}</td>
-              <td>${brl(stay.daily_amount)}</td>
-              <td class="row-actions"><div><button data-edit="${stay.id}">Editar</button><button class="danger" data-delete="${stay.id}">Excluir</button></div></td>
-            </tr>`).join('')}</tbody>
+          <tbody>${stays.map(renderStayRow).join('')}</tbody>
         </table>
       </section>
     </section>
@@ -203,36 +224,93 @@ export function bindHospedagens(refresh: () => void) {
     });
     location.hash = `/hospedagens?${params.toString()}`;
   });
-  document.querySelectorAll<HTMLButtonElement>('[data-edit]').forEach((button) => button.addEventListener('click', () => {
-    const params = new URLSearchParams(state.route.split('?')[1] ?? '');
-    params.set('id', button.dataset.edit!);
-    location.hash = `/hospedagens?${params.toString()}`;
-  }));
-  document.querySelectorAll<HTMLButtonElement>('[data-delete]').forEach((button) => button.addEventListener('click', async () => {
-    try {
-      await softDelete('stays', button.dataset.delete!);
-      refresh();
-    } catch (error) {
-      toast(error instanceof Error ? error.message : 'Erro ao excluir hospedagem.', 'error');
-    }
-  }));
   const carInfoDialog = qs<HTMLDialogElement>('#car-info-dialog');
   const carInfoContent = qs<HTMLElement>('#car-info-content');
   const copyCarPlateButton = qs<HTMLButtonElement>('#copy-car-plate');
   const carInfoPlateError = qs<HTMLElement>('#car-info-plate-error');
   let currentCarPlate: string | null = null;
 
-  document.querySelectorAll<HTMLButtonElement>('[data-car]').forEach((button) => button.addEventListener('click', () => {
-    const stay = stays.find((item) => item.id === button.dataset.car);
-    if (!stay?.car_info || !carInfoDialog || !carInfoContent || !copyCarPlateButton || !carInfoPlateError) return;
-    const carInfoParts = stay.car_info.split(' - ');
-    currentCarPlate = carInfoParts.length >= 3 ? carInfoParts[1].trim() || null : null;
-    carInfoContent.textContent = stay.car_info;
-    copyCarPlateButton.textContent = currentCarPlate ? `Copiar placa ${currentCarPlate}` : 'Copiar placa';
-    copyCarPlateButton.disabled = !currentCarPlate;
-    carInfoPlateError.hidden = Boolean(currentCarPlate);
-    carInfoDialog.showModal();
-  }));
+  const updateStayInList = (stay: Stay) => {
+    stays = stays.map((item) => item.id === stay.id ? stay : item);
+  };
+
+  const replaceStayRow = (stay: Stay) => {
+    const row = qs<HTMLTableRowElement>(`[data-stay-row="${stay.id}"]`);
+    if (row) row.outerHTML = renderStayRow(stay);
+  };
+
+  const table = qs<HTMLElement>('.stays-table table');
+  table?.addEventListener('click', async (event) => {
+    const target = event.target as HTMLElement;
+    const editButton = target.closest<HTMLButtonElement>('[data-edit]');
+    if (editButton && table.contains(editButton)) {
+      const params = new URLSearchParams(state.route.split('?')[1] ?? '');
+      params.set('id', editButton.dataset.edit!);
+      location.hash = `/hospedagens?${params.toString()}`;
+      return;
+    }
+
+    const deleteButton = target.closest<HTMLButtonElement>('[data-delete]');
+    if (deleteButton && table.contains(deleteButton)) {
+      try {
+        await softDelete('stays', deleteButton.dataset.delete!);
+        refresh();
+      } catch (error) {
+        toast(error instanceof Error ? error.message : 'Erro ao excluir hospedagem.', 'error');
+      }
+      return;
+    }
+
+    const carButton = target.closest<HTMLButtonElement>('[data-car]');
+    if (carButton && table.contains(carButton)) {
+      const stay = stays.find((item) => item.id === carButton.dataset.car);
+      if (!stay?.car_info || !carInfoDialog || !carInfoContent || !copyCarPlateButton || !carInfoPlateError) return;
+      const carInfoParts = stay.car_info.split(' - ');
+      currentCarPlate = carInfoParts.length >= 3 ? carInfoParts[1].trim() || null : null;
+      carInfoContent.textContent = stay.car_info;
+      copyCarPlateButton.textContent = currentCarPlate ? `Copiar placa ${currentCarPlate}` : 'Copiar placa';
+      copyCarPlateButton.disabled = !currentCarPlate;
+      carInfoPlateError.hidden = Boolean(currentCarPlate);
+      carInfoDialog.showModal();
+      return;
+    }
+
+    const cycleButton = target.closest<HTMLButtonElement>('[data-cycle-field]');
+    if (!cycleButton || !table.contains(cycleButton)) return;
+    const field = cycleButton.dataset.cycleField as InlineStayField;
+    const stay = stays.find((item) => item.id === cycleButton.dataset.stayId);
+    if (!stay || (field !== 'reservation_status' && field !== 'payment_status')) return;
+    if (!isCompanyActive()) {
+      toast('Não é possível cadastrar em uma empresa inativa.', 'error');
+      return;
+    }
+
+    const key = `${stay.id}:${field}`;
+    if (updatingInlineFields.has(key)) return;
+
+    const options = field === 'reservation_status' ? RESERVATION_STATUS_OPTIONS : PAYMENT_STATUS_OPTIONS;
+    const previousStay = { ...stay };
+    const nextValue = nextOptionName(stay[field], options);
+    const optimisticStay = { ...stay, [field]: nextValue };
+    const values = { [field]: nextValue } as Pick<Partial<Stay>, InlineStayField>;
+
+    updatingInlineFields.add(key);
+    updateStayInList(optimisticStay);
+    replaceStayRow(optimisticStay);
+
+    try {
+      const updatedStay = await updateStayInline(state.company!.id, previousStay, values);
+      updatingInlineFields.delete(key);
+      updateStayInList(updatedStay);
+      replaceStayRow(updatedStay);
+    } catch (error) {
+      updatingInlineFields.delete(key);
+      updateStayInList(previousStay);
+      replaceStayRow(previousStay);
+      toast(error instanceof Error ? error.message : 'Erro ao salvar hospedagem.', 'error');
+    }
+  });
+
   copyCarPlateButton?.addEventListener('click', async () => {
     if (!currentCarPlate) return;
     try {

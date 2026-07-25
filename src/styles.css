@@ -67,6 +67,8 @@ tr.unpaid td { background: #ffecec; }
 .stays-table th, .stays-table td { vertical-align: middle; }
 .stays-table .row-actions { display: table-cell; }
 .stays-table .row-actions > div { display: flex; align-items: center; gap: 6px; }
+.badge-button { appearance: none; border: 0; background: transparent; padding: 0; cursor: pointer; font: inherit; }
+.badge-button:disabled { cursor: wait; opacity: .75; }
 .stay-studio-cell { display: inline-flex; align-items: center; gap: 4px; }
 .car-info-button { padding: 5px; border: 0; background: transparent; line-height: 0; }
 .car-info-button svg { width: 20px; height: 20px; fill: currentColor; }
