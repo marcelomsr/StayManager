@@ -21,8 +21,10 @@ export const PAYMENT_STATUS_OPTIONS = [
 ] as const;
 
 export const CASH_DESCRIPTIONS = [
+  'Airbnb',
   'Gasolina para o carro',
   'Gasolina para a moto',
   'Lavadora e secadora',
-  'Produtos de limpeza'
+  'Produtos de limpeza',
+  'Rendimentos isentos e não tributáveis'
 ];
