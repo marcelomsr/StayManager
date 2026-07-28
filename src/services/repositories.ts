@@ -1,5 +1,5 @@
 import { supabase } from './supabase';
-import { CashEntry, CompanyUser, ExpenseEntry, ExpenseType, Id, Note, Platform, Stay, Studio } from '../types';
+import { CashEntry, CompanyUser, ExpenseEntry, ExpenseType, Id, MonthRef, Note, Platform, Stay, Studio } from '../types';
 import { monthBounds, pad } from '../utils/date';
 import { hasAccessToCompany, state } from '../state/app-state';
 
@@ -198,6 +198,56 @@ export async function saveExpenseEntry(companyId: Id, values: Partial<ExpenseEnt
     ? await supabase.from('expense_entries').update(payload).eq('id', values.id)
     : await supabase.from('expense_entries').insert(payload);
   if (error) throw error;
+}
+
+export async function cloneExpenseEntries(companyId: Id, source: MonthRef, target: MonthRef) {
+  companyRequired(companyId);
+  const sourceReference = `${source.year}-${pad(source.month)}-01`;
+  const targetReference = `${target.year}-${pad(target.month)}-01`;
+
+  if (sourceReference === targetReference) {
+    throw new Error('Selecione meses diferentes para clonar.');
+  }
+
+  const { data: sourceEntries, error: sourceError } = await supabase
+    .from('expense_entries')
+    .select('*')
+    .eq('company_id', companyId)
+    .eq('reference_month', sourceReference);
+  if (sourceError) throw sourceError;
+
+  const entriesToClone = (sourceEntries ?? []) as ExpenseEntry[];
+  if (!entriesToClone.length) {
+    return { clonedCount: 0, duplicateCount: 0 };
+  }
+
+  const { data: targetEntries, error: targetError } = await supabase
+    .from('expense_entries')
+    .select('studio_id,expense_type_id')
+    .eq('company_id', companyId)
+    .eq('reference_month', targetReference);
+  if (targetError) throw targetError;
+
+  const targetKeys = new Set((targetEntries ?? []).map((entry) => `${entry.studio_id}:${entry.expense_type_id}`));
+  const duplicateCount = entriesToClone.filter((entry) => targetKeys.has(`${entry.studio_id}:${entry.expense_type_id}`)).length;
+  if (duplicateCount > 0) {
+    return { clonedCount: 0, duplicateCount };
+  }
+
+  const payload = entriesToClone.map((entry) => ({
+    company_id: companyId,
+    studio_id: entry.studio_id,
+    expense_type_id: entry.expense_type_id,
+    reference_month: targetReference,
+    payment_status: 'Não pago',
+    amount: entry.amount,
+    notes: entry.notes
+  }));
+
+  const { error } = await supabase.from('expense_entries').insert(payload);
+  if (error) throw error;
+
+  return { clonedCount: payload.length, duplicateCount: 0 };
 }
 
 export async function deleteExpenseEntry(companyId: Id, expenseEntryId: Id) {

@@ -1,6 +1,6 @@
 import { escapeHtml, qs, toast } from '../components/dom';
 import { appShell, pageHeader } from '../components/layout';
-import { listExpenseEntries, listExpenseTypes, listMonthStays, listStudios, saveExpenseEntry, saveExpenseType, deleteExpenseEntry } from '../services/repositories';
+import { cloneExpenseEntries, listExpenseEntries, listExpenseTypes, listMonthStays, listStudios, saveExpenseEntry, saveExpenseType, deleteExpenseEntry } from '../services/repositories';
 import { state, isCompanyActive } from '../state/app-state';
 import { ExpenseEntry, ExpenseType, Id, MonthRef, Studio, Stay } from '../types';
 import { addMonths, currentMonthRef, monthBounds, monthLabel, pad } from '../utils/date';
@@ -19,6 +19,17 @@ const renderExpenseTypeOptions = (studioId: Id) =>
   filterTypesByStudio(studioId)
     .map((type) => `<option value="${type.id}">${escapeHtml(type.name)}</option>`)
     .join('');
+
+const monthInputValue = (value: MonthRef) => `${value.year}-${pad(value.month)}`;
+
+const monthRefFromInput = (value: string): MonthRef | null => {
+  const match = value.match(/^(\d{4})-(\d{2})$/);
+  if (!match) return null;
+  const year = Number(match[1]);
+  const month = Number(match[2]);
+  if (!year || month < 1 || month > 12) return null;
+  return { year, month };
+};
 
 const toDateOnly = (value: string) => {
   const date = new Date(value);
@@ -104,6 +115,14 @@ export async function renderDespesas() {
         <button id="expense-entry-submit" class="primary">Lançar gasto</button>
       </form>
     </section>
+    <section class="panel">
+      <form id="expense-clone-form" class="form-grid">
+        <h2>Clonar mês</h2>
+        <label>Mês de origem <input type="month" name="source_month" value="${monthInputValue(ref)}" required /></label>
+        <label>Mês de destino <input type="month" name="target_month" value="${monthInputValue(addMonths(ref, 1))}" required /></label>
+        <button class="primary">Clonar mês</button>
+      </form>
+    </section>
     <section class="panel table-wrap">
       <table><thead><tr><th>Studio</th><th>Tipo</th><th>Pagamento</th><th>Valor</th><th>Observação</th><th></th></tr></thead>
       <tbody>${entries.map((entry) => `<tr class="${entry.payment_status === 'Pago' ? 'paid' : 'unpaid'}"><td>${escapeHtml(entry.studios?.name)}</td><td>${escapeHtml(entry.expense_types?.name)}</td><td>${badge(entry.payment_status)}</td><td>${brl(entry.amount)}</td><td>${escapeHtml(entry.notes)}</td><td class="row-actions"><button data-edit="${entry.id}">Editar</button><button class="danger" data-delete="${entry.id}">Excluir</button></td></tr>`).join('')}</tbody></table>
@@ -171,6 +190,48 @@ export function bindDespesas(refresh: () => void) {
     );
     toast('Tipo de gasto salvo.');
     refresh();
+  });
+
+  qs<HTMLFormElement>('#expense-clone-form')?.addEventListener('submit', async (event) => {
+    event.preventDefault();
+
+    if (!isCompanyActive()) {
+      toast('Não é possível cadastrar em uma empresa inativa.', 'error');
+      return;
+    }
+
+    const data = new FormData(event.currentTarget as HTMLFormElement);
+    const source = monthRefFromInput(String(data.get('source_month') || ''));
+    const target = monthRefFromInput(String(data.get('target_month') || ''));
+    if (!source || !target) {
+      toast('Informe o mês de origem e o mês de destino.', 'error');
+      return;
+    }
+
+    if (source.year === target.year && source.month === target.month) {
+      toast('Selecione meses diferentes para clonar.', 'error');
+      return;
+    }
+
+    if (!window.confirm(`Clonar as despesas de ${monthLabel(source)} para ${monthLabel(target)}?`)) {
+      return;
+    }
+
+    try {
+      const result = await cloneExpenseEntries(state.company!.id, source, target);
+      if (result.duplicateCount > 0) {
+        toast('Já existem despesas iguais no mês de destino. Nenhuma despesa foi clonada.', 'error');
+        return;
+      }
+      if (result.clonedCount === 0) {
+        toast('Não há despesas no mês de origem para clonar.', 'error');
+        return;
+      }
+      toast(`${result.clonedCount} despesa${result.clonedCount === 1 ? '' : 's'} clonada${result.clonedCount === 1 ? '' : 's'}.`);
+      refresh();
+    } catch (error) {
+      toast(error instanceof Error ? error.message : 'Erro ao clonar despesas.', 'error');
+    }
   });
 
   form.addEventListener('submit', async (event) => {
