@@ -115,17 +115,17 @@ export async function renderDespesas() {
         <button id="expense-entry-submit" class="primary">Lançar gasto</button>
       </form>
     </section>
-    <section class="panel">
-      <form id="expense-clone-form" class="form-grid">
-        <h2>Clonar mês</h2>
-        <label>Mês de origem <input type="month" name="source_month" value="${monthInputValue(ref)}" required /></label>
-        <label>Mês de destino <input type="month" name="target_month" value="${monthInputValue(addMonths(ref, 1))}" required /></label>
-        <button class="primary">Clonar mês</button>
-      </form>
-    </section>
     <section class="panel table-wrap">
       <table><thead><tr><th>Studio</th><th>Tipo</th><th>Pagamento</th><th>Valor</th><th>Observação</th><th></th></tr></thead>
       <tbody>${entries.map((entry) => `<tr class="${entry.payment_status === 'Pago' ? 'paid' : 'unpaid'}"><td>${escapeHtml(entry.studios?.name)}</td><td>${escapeHtml(entry.expense_types?.name)}</td><td>${badge(entry.payment_status)}</td><td>${brl(entry.amount)}</td><td>${escapeHtml(entry.notes)}</td><td class="row-actions"><button data-edit="${entry.id}">Editar</button><button class="danger" data-delete="${entry.id}">Excluir</button></td></tr>`).join('')}</tbody></table>
+    </section>
+    <section class="panel">
+      <form id="expense-clone-form" class="form-grid">
+        <h2>Clonar mês</h2>
+        <label>Mês de origem <input type="month" name="source_month" value="${monthInputValue(addMonths(ref, -1))}" required /></label>
+        <label>Mês de destino <input type="month" name="target_month" value="${monthInputValue(ref)}" required /></label>
+        <button class="primary">Clonar mês</button>
+      </form>
     </section>
   `);
 }
