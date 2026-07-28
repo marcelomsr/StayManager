@@ -11,6 +11,7 @@ let stays: Stay[] = [];
 let studios: Studio[] = [];
 let platforms: Platform[] = [];
 const updatingInlineFields = new Set<string>();
+let filterEndDateManuallyChanged = false;
 
 // Função auxiliar local para formatar valores numéricos no padrão pt-BR para os inputs
 const formatarMoedaInput = (valor: number | null | undefined): string => {
@@ -38,6 +39,17 @@ const formatDateTime = (value: string) => {
 
 const localDateInput = (date: Date) =>
   `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}`;
+
+const addDaysToDateInput = (value: string, amount: number) => {
+  const [year, month, day] = value.split('-').map(Number);
+  if (!year || !month || !day) return '';
+
+  const date = new Date(year, month - 1, day);
+  if (Number.isNaN(date.getTime())) return '';
+
+  date.setDate(date.getDate() + amount);
+  return localDateInput(date);
+};
 
 const shortWeekday = (value: string) => weekday(value).replace(/-feira$/, '');
 
@@ -216,6 +228,21 @@ function badge(label: string, color = '#d8dde8') {
 
 export function bindHospedagens(refresh: () => void) {
   const filterForm = qs<HTMLFormElement>('#stay-filters');
+  const filterStartInput = filterForm?.elements.namedItem('start') as HTMLInputElement | null;
+  const filterEndInput = filterForm?.elements.namedItem('end') as HTMLInputElement | null;
+
+  filterEndInput?.addEventListener('input', () => {
+    filterEndDateManuallyChanged = true;
+  });
+
+  filterStartInput?.addEventListener('input', () => {
+    if (!filterStartInput.value || !filterEndInput) return;
+    if (filterEndInput.value && filterEndDateManuallyChanged) return;
+
+    const nextDay = addDaysToDateInput(filterStartInput.value, 1);
+    if (nextDay) filterEndInput.value = nextDay;
+  });
+
   filterForm?.addEventListener('submit', (event) => {
     event.preventDefault();
     const params = new URLSearchParams();
