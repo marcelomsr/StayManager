@@ -1,16 +1,18 @@
 import { escapeHtml, qs, toast } from '../components/dom';
 import { appShell, pageHeader } from '../components/layout';
-import { cloneExpenseEntries, listExpenseEntries, listExpenseTypes, listMonthStays, listStudios, saveExpenseEntry, saveExpenseType, deleteExpenseEntry } from '../services/repositories';
+import { cloneExpenseEntries, listExpenseEntries, listExpenseTypes, listMonthStays, listStudios, saveExpenseEntry, saveExpenseType, deleteExpenseEntry, updateExpenseEntryInline } from '../services/repositories';
 import { state, isCompanyActive } from '../state/app-state';
 import { ExpenseEntry, ExpenseType, Id, MonthRef, Studio, Stay } from '../types';
 import { addMonths, currentMonthRef, monthBounds, monthLabel, pad } from '../utils/date';
 import { brl, sumExpressionValue } from '../utils/format';
+import { cycleInlineField, editableBadge } from '../utils/inline-grid';
 
 let ref: MonthRef = currentMonthRef();
 let selectedStudioId: Id = '';
 let entries: ExpenseEntry[] = [];
 let types: ExpenseType[] = [];
 let studios: Studio[] = [];
+const updatingInlineFields = new Set<string>();
 
 const filterTypesByStudio = (studioId: Id) =>
   types.filter((type) => type.studio_ids?.includes(studioId));
@@ -60,11 +62,26 @@ const EXPENSE_PAYMENT_STATUS_OPTIONS = [
   { name: 'Pago', color: '#8ec5ff' }
 ] as const;
 
-const badge = (label: string) => {
-  const option = EXPENSE_PAYMENT_STATUS_OPTIONS.find((item) => item.name === label);
-  const color = option?.color ?? '#d8dde8';
-  return `<span class="badge" style="--badge:${color}">${escapeHtml(label)}</span>`;
-};
+const paymentColor = (value: string) => EXPENSE_PAYMENT_STATUS_OPTIONS.find((item) => item.name === value)?.color;
+
+const editablePaymentBadge = (entry: ExpenseEntry) =>
+  editableBadge({
+    id: entry.id,
+    field: 'payment_status',
+    value: entry.payment_status,
+    color: paymentColor(entry.payment_status),
+    isUpdating: updatingInlineFields.has(`${entry.id}:payment_status`)
+  });
+
+const renderExpenseEntryRow = (entry: ExpenseEntry) => `
+  <tr class="${entry.payment_status === 'Pago' ? 'paid' : 'unpaid'}" data-expense-entry-row="${entry.id}">
+    <td>${escapeHtml(entry.studios?.name)}</td>
+    <td>${escapeHtml(entry.expense_types?.name)}</td>
+    <td>${editablePaymentBadge(entry)}</td>
+    <td>${brl(entry.amount)}</td>
+    <td>${escapeHtml(entry.notes)}</td>
+    <td class="row-actions"><button data-edit="${entry.id}">Editar</button><button class="danger" data-delete="${entry.id}">Excluir</button></td>
+  </tr>`;
 
 export async function renderDespesas() {
   if (!state.company) return appShell('');
@@ -115,9 +132,9 @@ export async function renderDespesas() {
         <button id="expense-entry-submit" class="primary">Lançar gasto</button>
       </form>
     </section>
-    <section class="panel table-wrap">
+    <section class="panel table-wrap expenses-table">
       <table><thead><tr><th>Studio</th><th>Tipo</th><th>Pagamento</th><th>Valor</th><th>Observação</th><th></th></tr></thead>
-      <tbody>${entries.map((entry) => `<tr class="${entry.payment_status === 'Pago' ? 'paid' : 'unpaid'}"><td>${escapeHtml(entry.studios?.name)}</td><td>${escapeHtml(entry.expense_types?.name)}</td><td>${badge(entry.payment_status)}</td><td>${brl(entry.amount)}</td><td>${escapeHtml(entry.notes)}</td><td class="row-actions"><button data-edit="${entry.id}">Editar</button><button class="danger" data-delete="${entry.id}">Excluir</button></td></tr>`).join('')}</tbody></table>
+      <tbody>${entries.map(renderExpenseEntryRow).join('')}</tbody></table>
     </section>
     <section class="panel">
       <form id="expense-clone-form" class="form-grid">
@@ -138,6 +155,16 @@ export function bindDespesas(refresh: () => void) {
   const expenseTypeSelect = qs<HTMLSelectElement>('#expense-entry-type');
   const submitButton = qs<HTMLButtonElement>('#expense-entry-submit');
   const studioFilter = qs<HTMLSelectElement>('#expense-studio-filter');
+  const table = qs<HTMLElement>('.expenses-table table');
+
+  const updateExpenseEntryInList = (entry: ExpenseEntry) => {
+    entries = entries.map((item) => item.id === entry.id ? entry : item);
+  };
+
+  const replaceExpenseEntryRow = (entry: ExpenseEntry) => {
+    const row = qs<HTMLTableRowElement>(`[data-expense-entry-row="${entry.id}"]`);
+    if (row) row.outerHTML = renderExpenseEntryRow(entry);
+  };
 
   const syncExpenseTypeOptions = (studioId: Id) => {
     if (!expenseTypeSelect) return;
@@ -276,31 +303,60 @@ export function bindDespesas(refresh: () => void) {
     }
   });
 
-  document.querySelectorAll<HTMLButtonElement>('[data-edit]').forEach((button) => button.addEventListener('click', () => {
-    const entry = entries.find((item) => item.id === button.dataset.edit)!;
-    if (!entry) return;
+  table?.addEventListener('click', async (event) => {
+    const target = event.target as HTMLElement;
 
-    (form.elements.namedItem('id') as HTMLInputElement).value = entry.id;
-    studioSelect!.value = entry.studio_id;
-    syncExpenseTypeOptions(entry.studio_id);
-    expenseTypeSelect!.value = entry.expense_type_id;
-    (form.elements.namedItem('payment_status') as HTMLSelectElement).value = entry.payment_status ?? 'Não pago';
-    (form.elements.namedItem('amount') as HTMLInputElement).value = Number(entry.amount).toLocaleString('pt-BR', {
-      minimumFractionDigits: 2,
-      maximumFractionDigits: 2,
-      useGrouping: false
-    });
-    (form.elements.namedItem('notes') as HTMLTextAreaElement).value = entry.notes ?? '';
-    submitButton!.textContent = 'Salvar alteração';
-  }));
+    const editButton = target.closest<HTMLButtonElement>('[data-edit]');
+    if (editButton && table.contains(editButton)) {
+      const entry = entries.find((item) => item.id === editButton.dataset.edit)!;
+      if (!entry) return;
 
-  document.querySelectorAll<HTMLButtonElement>('[data-delete]').forEach((button) => button.addEventListener('click', async () => {
-    try {
-      await deleteExpenseEntry(state.company!.id, button.dataset.delete!);
-      toast('Despesa excluída.');
-      refresh();
-    } catch (error) {
-      toast(error instanceof Error ? error.message : 'Erro ao excluir despesa.', 'error');
+      (form.elements.namedItem('id') as HTMLInputElement).value = entry.id;
+      studioSelect!.value = entry.studio_id;
+      syncExpenseTypeOptions(entry.studio_id);
+      expenseTypeSelect!.value = entry.expense_type_id;
+      (form.elements.namedItem('payment_status') as HTMLSelectElement).value = entry.payment_status ?? 'Não pago';
+      (form.elements.namedItem('amount') as HTMLInputElement).value = Number(entry.amount).toLocaleString('pt-BR', {
+        minimumFractionDigits: 2,
+        maximumFractionDigits: 2,
+        useGrouping: false
+      });
+      (form.elements.namedItem('notes') as HTMLTextAreaElement).value = entry.notes ?? '';
+      submitButton!.textContent = 'Salvar alteração';
+      return;
     }
-  }));
+
+    const deleteButton = target.closest<HTMLButtonElement>('[data-delete]');
+    if (deleteButton && table.contains(deleteButton)) {
+      try {
+        await deleteExpenseEntry(state.company!.id, deleteButton.dataset.delete!);
+        toast('Despesa excluída.');
+        refresh();
+      } catch (error) {
+        toast(error instanceof Error ? error.message : 'Erro ao excluir despesa.', 'error');
+      }
+      return;
+    }
+
+    const cycleButton = target.closest<HTMLButtonElement>('[data-cycle-field]');
+    if (!cycleButton || !table.contains(cycleButton)) return;
+    const field = cycleButton.dataset.cycleField;
+    const entry = entries.find((item) => item.id === cycleButton.dataset.inlineId);
+    if (!entry || field !== 'payment_status') return;
+    if (!isCompanyActive()) {
+      toast('Não é possível cadastrar em uma empresa inativa.', 'error');
+      return;
+    }
+
+    await cycleInlineField({
+      item: entry,
+      field,
+      options: EXPENSE_PAYMENT_STATUS_OPTIONS,
+      updatingFields: updatingInlineFields,
+      updateItem: updateExpenseEntryInList,
+      replaceRow: replaceExpenseEntryRow,
+      persist: (previousEntry, values) => updateExpenseEntryInline(state.company!.id, previousEntry, values),
+      onError: (error) => toast(error instanceof Error ? error.message : 'Erro ao salvar despesa.', 'error')
+    });
+  });
 }

@@ -6,6 +6,7 @@ import { state, isCompanyActive } from '../state/app-state';
 import { Platform, Stay, Studio } from '../types';
 import { calculateNights, isWithinNextDays, pad, toDateInput, toDateTimeInput, weekday } from '../utils/date';
 import { brl, sumExpressionValue } from '../utils/format';
+import { badge, cycleInlineField, editableBadge } from '../utils/inline-grid';
 
 let stays: Stay[] = [];
 let studios: Studio[] = [];
@@ -55,20 +56,14 @@ const shortWeekday = (value: string) => weekday(value).replace(/-feira$/, '');
 
 type InlineStayField = 'reservation_status' | 'payment_status';
 
-const nextOptionName = (currentValue: string, options: readonly { name: string }[]) => {
-  const currentIndex = options.findIndex((item) => item.name === currentValue);
-  const nextIndex = currentIndex >= 0 ? (currentIndex + 1) % options.length : 0;
-  return options[nextIndex]?.name ?? currentValue;
-};
-
 const statusColor = (value: string) => RESERVATION_STATUS_OPTIONS.find((item) => item.name === value)?.color;
 const paymentColor = (value: string) => PAYMENT_STATUS_OPTIONS.find((item) => item.name === value)?.color;
 
-const editableBadge = (stay: Stay, field: InlineStayField) => {
+const editableStayBadge = (stay: Stay, field: InlineStayField) => {
   const value = stay[field];
   const color = field === 'reservation_status' ? statusColor(value) : paymentColor(value);
   const isUpdating = updatingInlineFields.has(`${stay.id}:${field}`);
-  return `<button type="button" class="badge-button" data-cycle-field="${field}" data-stay-id="${stay.id}" ${isUpdating ? 'disabled aria-busy="true"' : ''}>${badge(value, color)}</button>`;
+  return editableBadge({ id: stay.id, field, value, color, isUpdating });
 };
 
 const renderStayRow = (stay: Stay) => `
@@ -82,8 +77,8 @@ const renderStayRow = (stay: Stay) => `
     <td>${escapeHtml(stay.guests_names)}</td>
     <td>${stay.nights_count}</td>
     <td>${badge(stay.platforms?.name ?? '', stay.platforms?.color)}</td>
-    <td>${editableBadge(stay, 'reservation_status')}</td>
-    <td>${editableBadge(stay, 'payment_status')}</td>
+    <td>${editableStayBadge(stay, 'reservation_status')}</td>
+    <td>${editableStayBadge(stay, 'payment_status')}</td>
     <td>${brl(stay.total_amount)}</td>
     <td>${brl(stay.fees_amount)}</td>
     <td>${brl(stay.net_amount)}</td>
@@ -222,10 +217,6 @@ function stayForm(stay?: Stay) {
     </form>`;
 }
 
-function badge(label: string, color = '#d8dde8') {
-  return `<span class="badge" style="--badge:${color}">${escapeHtml(label)}</span>`;
-}
-
 export function bindHospedagens(refresh: () => void) {
   const filterForm = qs<HTMLFormElement>('#stay-filters');
   const filterStartInput = filterForm?.elements.namedItem('start') as HTMLInputElement | null;
@@ -305,37 +296,24 @@ export function bindHospedagens(refresh: () => void) {
     const cycleButton = target.closest<HTMLButtonElement>('[data-cycle-field]');
     if (!cycleButton || !table.contains(cycleButton)) return;
     const field = cycleButton.dataset.cycleField as InlineStayField;
-    const stay = stays.find((item) => item.id === cycleButton.dataset.stayId);
+    const stay = stays.find((item) => item.id === cycleButton.dataset.inlineId);
     if (!stay || (field !== 'reservation_status' && field !== 'payment_status')) return;
     if (!isCompanyActive()) {
       toast('Não é possível cadastrar em uma empresa inativa.', 'error');
       return;
     }
 
-    const key = `${stay.id}:${field}`;
-    if (updatingInlineFields.has(key)) return;
-
     const options = field === 'reservation_status' ? RESERVATION_STATUS_OPTIONS : PAYMENT_STATUS_OPTIONS;
-    const previousStay = { ...stay };
-    const nextValue = nextOptionName(stay[field], options);
-    const optimisticStay = { ...stay, [field]: nextValue };
-    const values = { [field]: nextValue } as Pick<Partial<Stay>, InlineStayField>;
-
-    updatingInlineFields.add(key);
-    updateStayInList(optimisticStay);
-    replaceStayRow(optimisticStay);
-
-    try {
-      const updatedStay = await updateStayInline(state.company!.id, previousStay, values);
-      updatingInlineFields.delete(key);
-      updateStayInList(updatedStay);
-      replaceStayRow(updatedStay);
-    } catch (error) {
-      updatingInlineFields.delete(key);
-      updateStayInList(previousStay);
-      replaceStayRow(previousStay);
-      toast(error instanceof Error ? error.message : 'Erro ao salvar hospedagem.', 'error');
-    }
+    await cycleInlineField({
+      item: stay,
+      field,
+      options,
+      updatingFields: updatingInlineFields,
+      updateItem: updateStayInList,
+      replaceRow: replaceStayRow,
+      persist: (previousStay, values) => updateStayInline(state.company!.id, previousStay, values),
+      onError: (error) => toast(error instanceof Error ? error.message : 'Erro ao salvar hospedagem.', 'error')
+    });
   });
 
   copyCarPlateButton?.addEventListener('click', async () => {

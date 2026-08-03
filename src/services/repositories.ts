@@ -200,6 +200,20 @@ export async function saveExpenseEntry(companyId: Id, values: Partial<ExpenseEnt
   if (error) throw error;
 }
 
+export async function updateExpenseEntryInline(companyId: Id, expenseEntry: ExpenseEntry, values: Pick<Partial<ExpenseEntry>, 'payment_status'>) {
+  companyRequired(companyId);
+
+  const { data, error } = await supabase
+    .from('expense_entries')
+    .update(values)
+    .eq('id', expenseEntry.id)
+    .eq('company_id', companyId)
+    .select('*,expense_types(*),studios(*)')
+    .single();
+  if (error) throw error;
+  return data as ExpenseEntry;
+}
+
 export async function cloneExpenseEntries(companyId: Id, source: MonthRef, target: MonthRef) {
   companyRequired(companyId);
   const sourceReference = `${source.year}-${pad(source.month)}-01`;
