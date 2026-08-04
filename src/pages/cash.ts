@@ -1,11 +1,12 @@
 import { CASH_DESCRIPTIONS } from '../config';
 import { escapeHtml, qs, toast } from '../components/dom';
 import { appShell, pageHeader } from '../components/layout';
-import { listCashEntries, saveCashEntry, deleteCashEntry } from '../services/repositories';
+import { listCashEntries, listMonthStays, saveCashEntry, deleteCashEntry } from '../services/repositories';
 import { state, isCompanyActive } from '../state/app-state';
 import { CashEntry, MonthRef } from '../types';
 import { addMonths, currentMonthRef, monthLabel, pad } from '../utils/date';
 import { brl, sumExpressionValue } from '../utils/format';
+import { amountInMonth } from '../utils/stays';
 
 const formatDate = (value: string) => {
   if (!value) return '';
@@ -29,15 +30,21 @@ let entries: CashEntry[] = [];
 export async function renderCash() {
   if (!state.company) return appShell('');
   
-  // 1. Busca as entradas filtradas do mês atual para as tabelas e métricas mensais
-  entries = await listCashEntries(state.company.id, ref.year, ref.month);
-  
-  // 2. Busca TODOS os lançamentos da história da empresa para calcular o Saldo Total global
-  const allEntries = await listCashEntries(state.company.id, undefined, undefined) as CashEntry[] || [];
+  const [monthEntries, allEntries, monthStays] = await Promise.all([
+    listCashEntries(state.company.id, ref.year, ref.month),
+    listCashEntries(state.company.id, undefined, undefined) as Promise<CashEntry[]>,
+    listMonthStays(state.company.id, ref.year, ref.month)
+  ]);
+  entries = monthEntries;
 
   // Cálculos do mês atual
   const entradas = entries.filter((item) => item.kind === 'entrada').reduce((sum, item) => sum + Number(item.amount), 0);
   const saidas = entries.filter((item) => item.kind === 'saida').reduce((sum, item) => sum + Number(item.amount), 0);
+  const saldoMes = entradas - saidas;
+  const aReceberMes = monthStays
+    .filter((stay) => stay.payment_status === 'A receber')
+    .reduce((sum, stay) => sum + amountInMonth(stay, stay.net_amount, ref), 0);
+  const previsaoMes = saldoMes + aReceberMes;
   const entradasEntries = entries.filter((item) => item.kind === 'entrada');
   const saidasEntries = entries.filter((item) => item.kind === 'saida');
 
@@ -55,7 +62,8 @@ export async function renderCash() {
     <section class="cards-grid">
       <article class="metric-card"><span>Entradas</span><strong>${brl(entradas)}</strong></article>
       <article class="metric-card"><span>Saídas</span><strong>${brl(saidas)}</strong></article>
-      <article class="metric-card"><span>Saldo do mês</span><strong>${brl(entradas - saidas)}</strong></article>
+      <article class="metric-card"><span>Saldo do mês</span><strong>${brl(saldoMes)}</strong></article>
+      <article class="metric-card"><span>Previsão do mês</span><strong>${brl(previsaoMes)}</strong></article>
       <article class="metric-card" style="border-left: 4px solid #228be6;"><span>Saldo Total</span><strong>${brl(saldoTotalGlobal)}</strong></article>
     </section>
     <section class="split">
