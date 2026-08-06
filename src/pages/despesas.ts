@@ -62,6 +62,17 @@ const EXPENSE_PAYMENT_STATUS_OPTIONS = [
   { name: 'Pago', color: '#8ec5ff' }
 ] as const;
 
+const expenseEntryCollator = new Intl.Collator('pt-BR', { sensitivity: 'base' });
+
+const paymentStatusOrder = (paymentStatus: string) => paymentStatus === 'Pago' ? 1 : 0;
+
+const compareExpenseEntries = (left: ExpenseEntry, right: ExpenseEntry) =>
+  paymentStatusOrder(left.payment_status) - paymentStatusOrder(right.payment_status)
+  || expenseEntryCollator.compare(left.studios?.name ?? '', right.studios?.name ?? '')
+  || expenseEntryCollator.compare(left.expense_types?.name ?? '', right.expense_types?.name ?? '');
+
+const sortExpenseEntries = (items: ExpenseEntry[]) => [...items].sort(compareExpenseEntries);
+
 const paymentColor = (value: string) => EXPENSE_PAYMENT_STATUS_OPTIONS.find((item) => item.name === value)?.color;
 
 const editablePaymentBadge = (entry: ExpenseEntry) =>
@@ -85,11 +96,14 @@ const renderExpenseEntryRow = (entry: ExpenseEntry) => `
 
 export async function renderDespesas() {
   if (!state.company) return appShell('');
-  [entries, types, studios] = await Promise.all([
+  const [loadedEntries, loadedTypes, loadedStudios] = await Promise.all([
     listExpenseEntries(state.company.id, ref.year, ref.month, selectedStudioId),
     listExpenseTypes(state.company.id),
     listStudios(state.company.id)
   ]);
+  entries = sortExpenseEntries(loadedEntries);
+  types = loadedTypes;
+  studios = loadedStudios;
   const stays = await listMonthStays(state.company.id, ref.year, ref.month, selectedStudioId);
   const totalExpenses = entries.reduce((sum, entry) => sum + Number(entry.amount), 0);
   const revenue = stays.reduce((sum, stay) => sum + proratedNetAmountForMonth(stay, ref), 0);
@@ -158,12 +172,12 @@ export function bindDespesas(refresh: () => void) {
   const table = qs<HTMLElement>('.expenses-table table');
 
   const updateExpenseEntryInList = (entry: ExpenseEntry) => {
-    entries = entries.map((item) => item.id === entry.id ? entry : item);
+    entries = sortExpenseEntries(entries.map((item) => item.id === entry.id ? entry : item));
   };
 
-  const replaceExpenseEntryRow = (entry: ExpenseEntry) => {
-    const row = qs<HTMLTableRowElement>(`[data-expense-entry-row="${entry.id}"]`);
-    if (row) row.outerHTML = renderExpenseEntryRow(entry);
+  const renderExpenseEntryRows = () => {
+    const tbody = qs<HTMLTableSectionElement>('.expenses-table tbody');
+    if (tbody) tbody.innerHTML = entries.map(renderExpenseEntryRow).join('');
   };
 
   const syncExpenseTypeOptions = (studioId: Id) => {
@@ -354,8 +368,8 @@ export function bindDespesas(refresh: () => void) {
       options: EXPENSE_PAYMENT_STATUS_OPTIONS,
       updatingFields: updatingInlineFields,
       updateItem: updateExpenseEntryInList,
-      replaceRow: replaceExpenseEntryRow,
       persist: (previousEntry, values) => updateExpenseEntryInline(state.company!.id, previousEntry, values),
+      replaceRow: renderExpenseEntryRows,
       onError: (error) => toast(error instanceof Error ? error.message : 'Erro ao salvar despesa.', 'error')
     });
   });
