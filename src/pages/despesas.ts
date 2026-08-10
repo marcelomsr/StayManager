@@ -64,7 +64,12 @@ const EXPENSE_PAYMENT_STATUS_OPTIONS = [
 
 const expenseEntryCollator = new Intl.Collator('pt-BR', { sensitivity: 'base' });
 
-const paymentStatusOrder = (paymentStatus: string) => paymentStatus === 'Pago' ? 1 : 0;
+const expensePaymentStatusOrder: Record<string, number> = {
+  'Não pago': 0,
+  Pago: 1
+};
+
+const paymentStatusOrder = (paymentStatus: string) => expensePaymentStatusOrder[paymentStatus] ?? 2;
 
 const compareExpenseEntries = (left: ExpenseEntry, right: ExpenseEntry) =>
   paymentStatusOrder(left.payment_status) - paymentStatusOrder(right.payment_status)
