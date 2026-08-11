@@ -133,12 +133,19 @@ export async function renderDespesas() {
       <article class="metric-card"><span>Média para se pagar</span><strong>${brl(dailyGoal)}</strong></article>
     </section>
     <section class="split">
-      <form id="expense-type-form" class="panel form-grid">
-        <h2>Tipo de gasto</h2>
-        <input type="hidden" name="id" />
-        <label>Nome <input name="name" required /></label>
-        <div class="checkbox-list">${studios.map((studio) => `<label class="check"><input type="checkbox" name="studio_ids" value="${studio.id}" /> ${escapeHtml(studio.name)}</label>`).join('')}</div>
-        <button class="primary">Salvar tipo</button>
+      <form id="expense-type-form" class="panel form-grid collapse-panel">
+        <h2 class="collapse-heading">
+          <button id="expense-type-toggle" class="collapse-toggle" type="button" aria-expanded="false" aria-controls="expense-type-fields">
+            <span>Tipo de gasto</span>
+            <span class="collapse-indicator" aria-hidden="true">⌄</span>
+          </button>
+        </h2>
+        <div id="expense-type-fields" class="collapse-content form-grid" aria-hidden="true">
+          <input type="hidden" name="id" />
+          <label>Nome <input name="name" required /></label>
+          <div class="checkbox-list">${studios.map((studio) => `<label class="check"><input type="checkbox" name="studio_ids" value="${studio.id}" /> ${escapeHtml(studio.name)}</label>`).join('')}</div>
+          <button class="primary">Salvar tipo</button>
+        </div>
       </form>
       <form id="expense-entry-form" class="panel form-grid">
         <h2>Lançamento mensal</h2>
@@ -175,6 +182,19 @@ export function bindDespesas(refresh: () => void) {
   const submitButton = qs<HTMLButtonElement>('#expense-entry-submit');
   const studioFilter = qs<HTMLSelectElement>('#expense-studio-filter');
   const table = qs<HTMLElement>('.expenses-table table');
+  const expenseTypeToggle = qs<HTMLButtonElement>('#expense-type-toggle');
+  const expenseTypeFields = qs<HTMLElement>('#expense-type-fields');
+  const expenseTypeIndicator = expenseTypeToggle?.querySelector<HTMLElement>('.collapse-indicator');
+
+  expenseTypeToggle?.addEventListener('click', () => {
+    if (!expenseTypeFields) return;
+    const isExpanded = expenseTypeToggle.getAttribute('aria-expanded') === 'true';
+    const nextExpanded = !isExpanded;
+    expenseTypeToggle.setAttribute('aria-expanded', String(nextExpanded));
+    expenseTypeFields.setAttribute('aria-hidden', String(!nextExpanded));
+    expenseTypeFields.style.maxHeight = nextExpanded ? `${expenseTypeFields.scrollHeight}px` : '0px';
+    if (expenseTypeIndicator) expenseTypeIndicator.textContent = nextExpanded ? '⌃' : '⌄';
+  });
 
   const updateExpenseEntryInList = (entry: ExpenseEntry) => {
     entries = sortExpenseEntries(entries.map((item) => item.id === entry.id ? entry : item));

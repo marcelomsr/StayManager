@@ -46,6 +46,37 @@ label.check input { width: auto; }
 .page-header h1 { margin: 0; font-size: 28px; }
 .panel { background: var(--panel); border-top: 1px solid var(--line); border-bottom: 1px solid var(--line); padding: 18px; margin: 0 24px 18px; }
 .panel h2 { margin: 0 0 14px; font-size: 18px; }
+.collapse-panel { gap: 0; }
+.panel h2.collapse-heading { margin-bottom: 0; }
+.collapse-toggle {
+  width: 100%;
+  border: 0;
+  background: transparent;
+  padding: 0;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  font-weight: 700;
+  font-size: 18px;
+  text-align: left;
+}
+.collapse-toggle:focus-visible { outline: 2px solid var(--primary); outline-offset: 4px; }
+.collapse-indicator { line-height: 1; }
+.collapse-content {
+  max-height: 0;
+  margin-top: 0;
+  opacity: 0;
+  overflow: hidden;
+  visibility: hidden;
+  transition: max-height .24s ease, margin-top .24s ease, opacity .18s ease, visibility 0s linear .24s;
+}
+.collapse-content[aria-hidden="false"] {
+  margin-top: 14px;
+  opacity: 1;
+  visibility: visible;
+  transition: max-height .24s ease, margin-top .24s ease, opacity .18s ease;
+}
 .cards-grid { display: grid; grid-template-columns: repeat(7, minmax(140px, 1fr)); gap: 12px; padding: 0 24px 18px; }
 .metric-card { background: #fff; border: 1px solid var(--line); border-radius: 8px; padding: 16px; min-height: 92px; display: grid; align-content: space-between; }
 .metric-card span { color: var(--muted); font-size: 12px; }
