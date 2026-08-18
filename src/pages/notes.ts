@@ -19,10 +19,35 @@ export async function renderNotes() {
         <button class="primary">Salvar anotação</button>
       </form>
       <section class="notes-grid">${notes.map((note) => `
-        <article class="note-card"><h3>${escapeHtml(note.title)}</h3><p>${escapeHtml(note.body)}</p><button data-edit="${note.id}">Editar</button><button class="danger" data-delete="${note.id}">Excluir</button></article>
+        <article class="note-card"><h3>${escapeHtml(note.title)}</h3><p>${escapeHtml(note.body)}</p><div class="note-actions"><button data-copy="${note.id}">Copiar</button><button data-edit="${note.id}">Editar</button><button class="danger" data-delete="${note.id}">Excluir</button></div></article>
       `).join('')}</section>
     </section>
   `);
+}
+
+async function copyText(text: string) {
+  if (navigator.clipboard?.writeText) {
+    try {
+      await navigator.clipboard.writeText(text);
+      return;
+    } catch {
+      // Fall back for browsers that expose clipboard but block it in this context.
+    }
+  }
+
+  const textarea = document.createElement('textarea');
+  textarea.value = text;
+  textarea.setAttribute('readonly', '');
+  textarea.style.position = 'fixed';
+  textarea.style.top = '-9999px';
+  document.body.appendChild(textarea);
+  textarea.select();
+  const copied = document.execCommand('copy');
+  textarea.remove();
+
+  if (!copied) {
+    throw new Error('Copy failed');
+  }
 }
 
 export function bindNotes(refresh: () => void) {
@@ -46,6 +71,23 @@ export function bindNotes(refresh: () => void) {
     (form.elements.namedItem('id') as HTMLInputElement).value = note.id;
     (form.elements.namedItem('title') as HTMLInputElement).value = note.title;
     (form.elements.namedItem('body') as HTMLTextAreaElement).value = note.body;
+  }));
+  document.querySelectorAll<HTMLButtonElement>('[data-copy]').forEach((button) => button.addEventListener('click', async () => {
+    const note = notes.find((item) => item.id === button.dataset.copy);
+    if (!note) return;
+
+    try {
+      await copyText(note.body);
+      const originalText = button.textContent || 'Copiar';
+      button.textContent = 'Copiado!';
+      button.disabled = true;
+      window.setTimeout(() => {
+        button.textContent = originalText;
+        button.disabled = false;
+      }, 1600);
+    } catch {
+      toast('Não foi possível copiar a anotação.', 'error');
+    }
   }));
   document.querySelectorAll<HTMLButtonElement>('[data-delete]').forEach((button) => button.addEventListener('click', async () => {
     await softDelete('notes', button.dataset.delete!);

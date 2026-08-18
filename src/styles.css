@@ -121,6 +121,7 @@ tr.unpaid td { background: #ffecec; }
 .note-card { background: #fff; border: 1px solid var(--line); border-radius: 8px; padding: 14px; }
 .note-card h3 { margin: 0 0 8px; }
 .note-card p { white-space: pre-wrap; color: #344054; }
+.note-actions { display: flex; flex-wrap: wrap; gap: 6px; }
 .checkbox-list { display: grid; gap: 8px; }
 .profile-panel { max-width: 620px; }
 .muted-text { color: var(--muted); }
