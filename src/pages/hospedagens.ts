@@ -72,14 +72,27 @@ const editableStayBadge = (stay: Stay, field: InlineStayField) => {
   return editableBadge({ id: stay.id, field, value, color, isUpdating });
 };
 
+const renderStayInfoIcons = (stay: Stay) => {
+  const hasCarInfo = Boolean(stay.car_info?.trim());
+  const hasNotes = Boolean(stay.notes?.trim());
+  if (!hasCarInfo && !hasNotes) return '';
+
+  return `<span class="stay-info-icons">
+    ${hasCarInfo ? `<button type="button" class="car-info-button" data-car="${stay.id}" aria-label="Ver informações do veículo" title="Ver informações do veículo">
+      <svg aria-hidden="true" viewBox="0 0 24 24"><path d="M5 11 6.5 7h11l1.5 4m-14 0h14a2 2 0 0 1 2 2v4h-2v2h-2v-2H7v2H5v-2H3v-4a2 2 0 0 1 2-2Zm2.5 3a1.5 1.5 0 1 0 0 3 1.5 1.5 0 0 0 0-3Zm9 0a1.5 1.5 0 1 0 0 3 1.5 1.5 0 0 0 0-3Z"/></svg>
+    </button>` : ''}
+    ${hasNotes ? `<button type="button" class="note-info-button" data-note="${stay.id}" aria-label="Ver observação" title="Ver observação">
+      <svg aria-hidden="true" viewBox="0 0 24 24"><path d="M6 3h9l4 4v14H6V3Zm8 1.8V8h3.2L14 4.8ZM8 11v1.8h8V11H8Zm0 4v1.8h8V15H8Z"/></svg>
+    </button>` : ''}
+  </span>`;
+};
+
 const renderStayRow = (stay: Stay) => `
   <tr class="${isWithinNextDays(stay.check_in_at, 7) ? 'upcoming' : ''}" data-stay-row="${stay.id}">
     <td>${formatDateTime(stay.check_in_at, '14:00')}</td>
     <td>${formatDateTime(stay.check_out_at, '11:00')}</td>
     <td>${shortWeekday(stay.check_out_at)}</td>
-    <td><span class="stay-studio-cell">${escapeHtml(stay.studios?.name)}${stay.car_info?.trim() ? `<button type="button" class="car-info-button" data-car="${stay.id}" aria-label="Ver informações do veículo" title="Ver informações do veículo">
-      <svg aria-hidden="true" viewBox="0 0 24 24"><path d="M5 11 6.5 7h11l1.5 4m-14 0h14a2 2 0 0 1 2 2v4h-2v2h-2v-2H7v2H5v-2H3v-4a2 2 0 0 1 2-2Zm2.5 3a1.5 1.5 0 1 0 0 3 1.5 1.5 0 0 0 0-3Zm9 0a1.5 1.5 0 1 0 0 3 1.5 1.5 0 0 0 0-3Z"/></svg>
-    </button>` : ''}</span></td>
+    <td><span class="stay-studio-cell">${escapeHtml(stay.studios?.name)}${renderStayInfoIcons(stay)}</span></td>
     <td>${escapeHtml(stay.guests_names)}</td>
     <td>${stay.nights_count}</td>
     <td>${badge(stay.platforms?.name ?? '', stay.platforms?.color)}</td>
@@ -156,6 +169,13 @@ export async function renderHospedagens() {
       <p id="car-info-plate-error" class="car-info-plate-error" hidden>Não foi possível identificar a placa.</p>
       <form method="dialog">
         <button type="button" id="copy-car-plate">Copiar placa</button>
+        <button>Fechar</button>
+      </form>
+    </dialog>
+    <dialog id="note-info-dialog" class="info-dialog">
+      <h2>Observação</h2>
+      <p id="note-info-content"></p>
+      <form method="dialog">
         <button>Fechar</button>
       </form>
     </dialog>
@@ -252,6 +272,8 @@ export function bindHospedagens(refresh: () => void) {
   const carInfoContent = qs<HTMLElement>('#car-info-content');
   const copyCarPlateButton = qs<HTMLButtonElement>('#copy-car-plate');
   const carInfoPlateError = qs<HTMLElement>('#car-info-plate-error');
+  const noteInfoDialog = qs<HTMLDialogElement>('#note-info-dialog');
+  const noteInfoContent = qs<HTMLElement>('#note-info-content');
   let currentCarPlate: string | null = null;
 
   const updateStayInList = (stay: Stay) => {
@@ -296,6 +318,15 @@ export function bindHospedagens(refresh: () => void) {
       copyCarPlateButton.disabled = !currentCarPlate;
       carInfoPlateError.hidden = Boolean(currentCarPlate);
       carInfoDialog.showModal();
+      return;
+    }
+
+    const noteButton = target.closest<HTMLButtonElement>('[data-note]');
+    if (noteButton && table.contains(noteButton)) {
+      const stay = stays.find((item) => item.id === noteButton.dataset.note);
+      if (!stay?.notes || !noteInfoDialog || !noteInfoContent) return;
+      noteInfoContent.textContent = stay.notes;
+      noteInfoDialog.showModal();
       return;
     }
 
