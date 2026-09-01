@@ -30,12 +30,18 @@ const converterStringParaNumero = (valor: any): number => {
   return Number(texto) || 0;
 };
 
-const formatDateTime = (value: string) => {
+const formatDateTime = (value: string, defaultTime: string) => {
   if (!value) return '';
   const date = new Date(value);
   const datePart = date.toLocaleDateString('pt-BR');
   const timePart = date.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' });
-  return `${datePart} ${timePart}`;
+  const rawTimePart = `${pad(date.getHours())}:${pad(date.getMinutes())}`;
+
+  if (rawTimePart === defaultTime) {
+    return `${datePart} ${timePart}`;
+  }
+
+  return `${datePart} <strong class="custom-stay-time">${timePart}<span aria-hidden="true" class="custom-stay-time-indicator"></span></strong>`;
 };
 
 const localDateInput = (date: Date) =>
@@ -68,8 +74,8 @@ const editableStayBadge = (stay: Stay, field: InlineStayField) => {
 
 const renderStayRow = (stay: Stay) => `
   <tr class="${isWithinNextDays(stay.check_in_at, 7) ? 'upcoming' : ''}" data-stay-row="${stay.id}">
-    <td>${formatDateTime(stay.check_in_at)}</td>
-    <td>${formatDateTime(stay.check_out_at)}</td>
+    <td>${formatDateTime(stay.check_in_at, '14:00')}</td>
+    <td>${formatDateTime(stay.check_out_at, '11:00')}</td>
     <td>${shortWeekday(stay.check_out_at)}</td>
     <td><span class="stay-studio-cell">${escapeHtml(stay.studios?.name)}${stay.car_info?.trim() ? `<button type="button" class="car-info-button" data-car="${stay.id}" aria-label="Ver informações do veículo" title="Ver informações do veículo">
       <svg aria-hidden="true" viewBox="0 0 24 24"><path d="M5 11 6.5 7h11l1.5 4m-14 0h14a2 2 0 0 1 2 2v4h-2v2h-2v-2H7v2H5v-2H3v-4a2 2 0 0 1 2-2Zm2.5 3a1.5 1.5 0 1 0 0 3 1.5 1.5 0 0 0 0-3Zm9 0a1.5 1.5 0 1 0 0 3 1.5 1.5 0 0 0 0-3Z"/></svg>
