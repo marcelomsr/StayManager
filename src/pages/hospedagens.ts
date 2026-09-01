@@ -38,10 +38,10 @@ const formatDateTime = (value: string, defaultTime: string) => {
   const rawTimePart = `${pad(date.getHours())}:${pad(date.getMinutes())}`;
 
   if (rawTimePart === defaultTime) {
-    return `${datePart} ${timePart}`;
+    return `<span class="stay-date-time"><span>${datePart}</span><span>${timePart}</span></span>`;
   }
 
-  return `${datePart} <strong class="custom-stay-time">${timePart}<span aria-hidden="true" class="custom-stay-time-indicator"></span></strong>`;
+  return `<span class="stay-date-time"><span>${datePart}</span><strong class="custom-stay-time">${timePart}<span aria-hidden="true" class="custom-stay-time-indicator"></span></strong></span>`;
 };
 
 const localDateInput = (date: Date) =>
@@ -89,8 +89,8 @@ const renderStayInfoIcons = (stay: Stay) => {
 
 const renderStayRow = (stay: Stay) => `
   <tr class="${isWithinNextDays(stay.check_in_at, 7) ? 'upcoming' : ''}" data-stay-row="${stay.id}">
-    <td>${formatDateTime(stay.check_in_at, '14:00')}</td>
-    <td>${formatDateTime(stay.check_out_at, '11:00')}</td>
+    <td class="sticky-col sticky-col-entry">${formatDateTime(stay.check_in_at, '14:00')}</td>
+    <td class="sticky-col sticky-col-exit">${formatDateTime(stay.check_out_at, '11:00')}</td>
     <td>${shortWeekday(stay.check_out_at)}</td>
     <td><span class="stay-studio-cell">${escapeHtml(stay.studios?.name)}${renderStayInfoIcons(stay)}</span></td>
     <td>${escapeHtml(stay.guests_names)}</td>
@@ -158,7 +158,7 @@ export async function renderHospedagens() {
       ${stayForm(edit)}
       <section class="panel table-wrap stays-table">
         <table>
-          <thead><tr><th>Entrada</th><th>Saída</th><th>Dia da saída</th><th>Studio</th><th>Hóspedes</th><th>Diárias</th><th>Plataforma</th><th>Status</th><th>Pagamento</th><th>Total</th><th>Taxas</th><th>Líquido</th><th>Diária</th><th></th></tr></thead>
+          <thead><tr><th class="sticky-col sticky-col-entry">Entrada</th><th class="sticky-col sticky-col-exit">Saída</th><th>Dia da saída</th><th>Studio</th><th>Hóspedes</th><th>Diárias</th><th>Plataforma</th><th>Status</th><th>Pagamento</th><th>Total</th><th>Taxas</th><th>Líquido</th><th>Diária</th><th></th></tr></thead>
           <tbody>${stays.map(renderStayRow).join('')}</tbody>
         </table>
       </section>
@@ -285,14 +285,24 @@ export function bindHospedagens(refresh: () => void) {
     if (row) row.outerHTML = renderStayRow(stay);
   };
 
+  const openStayEdit = (stayId: string) => {
+    const params = new URLSearchParams(state.route.split('?')[1] ?? '');
+    params.set('id', stayId);
+    location.hash = `/hospedagens?${params.toString()}`;
+  };
+
+  const isInteractiveRowTarget = (target: HTMLElement) =>
+    Boolean(target.closest('button, input, select, textarea, a, [role="button"], [contenteditable="true"]'));
+
   const table = qs<HTMLElement>('.stays-table table');
+  let lastTouchStayId = '';
+  let lastTouchAt = 0;
+
   table?.addEventListener('click', async (event) => {
     const target = event.target as HTMLElement;
     const editButton = target.closest<HTMLButtonElement>('[data-edit]');
     if (editButton && table.contains(editButton)) {
-      const params = new URLSearchParams(state.route.split('?')[1] ?? '');
-      params.set('id', editButton.dataset.edit!);
-      location.hash = `/hospedagens?${params.toString()}`;
+      openStayEdit(editButton.dataset.edit!);
       return;
     }
 
@@ -351,6 +361,38 @@ export function bindHospedagens(refresh: () => void) {
       persist: (previousStay, values) => updateStayInline(state.company!.id, previousStay, values),
       onError: (error) => toast(error instanceof Error ? error.message : 'Erro ao salvar hospedagem.', 'error')
     });
+  });
+
+  table?.addEventListener('dblclick', (event) => {
+    const target = event.target as HTMLElement;
+    if (isInteractiveRowTarget(target)) return;
+
+    const row = target.closest<HTMLTableRowElement>('[data-stay-row]');
+    if (!row || !table.contains(row)) return;
+    openStayEdit(row.dataset.stayRow!);
+  });
+
+  table?.addEventListener('pointerup', (event) => {
+    if (event.pointerType !== 'touch') return;
+
+    const target = event.target as HTMLElement;
+    if (isInteractiveRowTarget(target)) return;
+
+    const row = target.closest<HTMLTableRowElement>('[data-stay-row]');
+    if (!row || !table.contains(row)) return;
+
+    const now = Date.now();
+    const stayId = row.dataset.stayRow!;
+    if (stayId === lastTouchStayId && now - lastTouchAt <= 350) {
+      event.preventDefault();
+      lastTouchStayId = '';
+      lastTouchAt = 0;
+      openStayEdit(stayId);
+      return;
+    }
+
+    lastTouchStayId = stayId;
+    lastTouchAt = now;
   });
 
   copyCarPlateButton?.addEventListener('click', async () => {

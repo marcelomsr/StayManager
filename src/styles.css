@@ -96,12 +96,18 @@ tr.paid td { background: #eaf4ff; }
 tr.unpaid td { background: #ffecec; }
 .row-actions { white-space: nowrap; display: flex; gap: 6px; }
 .stays-table th, .stays-table td { vertical-align: middle; }
+.stays-table .sticky-col { position: sticky; z-index: 2; background: #fff; min-width: 104px; width: 104px; box-shadow: 1px 0 0 var(--line); }
+.stays-table th.sticky-col { z-index: 3; background: #f8fafc; }
+.stays-table .sticky-col-entry { left: 0; }
+.stays-table .sticky-col-exit { left: 104px; }
+.stays-table tr.upcoming td.sticky-col { background: #fff8db; }
 .stays-table .row-actions { display: table-cell; }
 .stays-table .row-actions > div { display: flex; align-items: center; gap: 6px; }
 .badge-button { appearance: none; border: 0; background: transparent; padding: 0; cursor: pointer; font: inherit; }
 .badge-button:disabled { cursor: wait; opacity: .75; }
 .stay-studio-cell { display: inline-flex; align-items: center; gap: 4px; }
 .stay-info-icons { display: inline-flex; flex-direction: column; align-items: center; justify-content: center; gap: 1px; }
+.stay-date-time { display: grid; gap: 2px; white-space: nowrap; }
 .custom-stay-time { display: inline-flex; align-items: center; gap: 4px; font-weight: 700; white-space: nowrap; }
 .custom-stay-time-indicator { width: 6px; height: 6px; border-radius: 999px; background: var(--primary); opacity: .75; flex: 0 0 auto; }
 .car-info-button, .note-info-button { padding: 2px; border: 0; background: transparent; line-height: 0; }
