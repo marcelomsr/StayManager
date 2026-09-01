@@ -58,7 +58,7 @@ export async function listStays(companyId: Id, filters: Record<string, string> =
   return data as Stay[];
 }
 
-export async function listMonthStays(companyId: Id, year: number, month: number, studioId?: Id) {
+export async function listMonthStays(companyId: Id, year: number, month: number, studioId?: Id, platformId?: Id) {
   const monthStart = new Date(year, month - 1, 1).toISOString();
   const nextMonthStart = new Date(year, month, 1).toISOString();
   let query = supabase
@@ -71,6 +71,7 @@ export async function listMonthStays(companyId: Id, year: number, month: number,
     .order('check_in_at');
 
   if (studioId) query = query.eq('studio_id', studioId);
+  if (platformId) query = query.eq('platform_id', platformId);
 
   const { data, error } = await query;
   if (error) throw error;

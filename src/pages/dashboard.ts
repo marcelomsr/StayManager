@@ -1,10 +1,10 @@
-import { PAYMENT_STATUS_OPTIONS, RESERVATION_STATUS_OPTIONS } from '../config';
+import { PAYMENT_STATUS_OPTIONS, PLATFORM_OPTIONS, RESERVATION_STATUS_OPTIONS } from '../config';
 import { renderCalendar } from '../components/calendar';
 import { escapeHtml, html, qs } from '../components/dom';
 import { appShell, pageHeader } from '../components/layout';
-import { listMonthStays, listStudios } from '../services/repositories';
+import { listMonthStays, listPlatforms, listStudios } from '../services/repositories';
 import { navigate, state } from '../state/app-state';
-import { Stay, MonthRef, Studio } from '../types';
+import { Stay, MonthRef, Platform, Studio } from '../types';
 import { addMonths, currentMonthRef, monthLabel, weekday } from '../utils/date';
 import { brl } from '../utils/format';
 import { amountInMonth, overlapNightsInMonth } from '../utils/stays';
@@ -12,17 +12,27 @@ import { amountInMonth, overlapNightsInMonth } from '../utils/stays';
 let ref: MonthRef = currentMonthRef();
 let stays: Stay[] = [];
 let studios: Studio[] = [];
+let platforms: Platform[] = [];
 let selectedStudioId = '';
+let selectedPlatformId = '';
 
 export async function renderDashboard() {
   if (!state.company) return appShell('');
-  [studios, stays] = await Promise.all([
+  [studios, platforms, stays] = await Promise.all([
     listStudios(state.company.id),
-    listMonthStays(state.company.id, ref.year, ref.month, selectedStudioId || undefined)
+    listPlatforms(state.company.id),
+    listMonthStays(state.company.id, ref.year, ref.month, selectedStudioId || undefined, selectedPlatformId || undefined)
   ]);
+  const dashboardPlatforms = PLATFORM_OPTIONS
+    .map(({ name }) => platforms.find((platform) => platform.name === name))
+    .filter((platform): platform is Platform => Boolean(platform));
   if (selectedStudioId && !studios.some((studio) => studio.id === selectedStudioId)) {
     selectedStudioId = '';
-    stays = await listMonthStays(state.company.id, ref.year, ref.month);
+    stays = await listMonthStays(state.company.id, ref.year, ref.month, undefined, selectedPlatformId || undefined);
+  }
+  if (selectedPlatformId && !dashboardPlatforms.some((platform) => platform.id === selectedPlatformId)) {
+    selectedPlatformId = '';
+    stays = await listMonthStays(state.company.id, ref.year, ref.month, selectedStudioId || undefined);
   }
   const total = stays.reduce((sum, stay) => sum + amountInMonth(stay, stay.total_amount, ref), 0);
   const fees = stays.reduce((sum, stay) => sum + amountInMonth(stay, stay.fees_amount, ref), 0);
@@ -43,6 +53,10 @@ export async function renderDashboard() {
         <select id="dashboard-studio-filter" aria-label="Filtrar por studio">
           <option value="">Todos</option>
           ${studios.map((studio) => `<option value="${studio.id}" ${studio.id === selectedStudioId ? 'selected' : ''}>${escapeHtml(studio.name)}</option>`).join('')}
+        </select>
+        <select id="dashboard-platform-filter" aria-label="Filtrar por plataforma">
+          <option value="">Todas</option>
+          ${dashboardPlatforms.map((platform) => `<option value="${platform.id}" ${platform.id === selectedPlatformId ? 'selected' : ''}>${escapeHtml(platform.name)}</option>`).join('')}
         </select>
         <button id="prev-month" class="ghost">Anterior</button>
         <strong>${monthLabel(ref)}</strong>
@@ -98,6 +112,10 @@ function badge(label: string, color = '#d8dde8') {
 export function bindDashboard() {
   qs<HTMLSelectElement>('#dashboard-studio-filter')?.addEventListener('change', (event) => {
     selectedStudioId = (event.currentTarget as HTMLSelectElement).value;
+    window.dispatchEvent(new HashChangeEvent('hashchange'));
+  });
+  qs<HTMLSelectElement>('#dashboard-platform-filter')?.addEventListener('change', (event) => {
+    selectedPlatformId = (event.currentTarget as HTMLSelectElement).value;
     window.dispatchEvent(new HashChangeEvent('hashchange'));
   });
   qs<HTMLButtonElement>('#prev-month')?.addEventListener('click', async () => {
