@@ -540,6 +540,17 @@ export function bindHospedagens(refresh: () => void) {
     qs<HTMLElement>('.garage-field', form)?.classList.toggle('hidden', !studio?.has_garage);
   });
 
+  const carInfoInput = form.elements.namedItem('car_info') as HTMLInputElement | null;
+  carInfoInput?.addEventListener('input', () => {
+    const upperValue = carInfoInput.value.toLocaleUpperCase('pt-BR');
+    if (carInfoInput.value === upperValue) return;
+
+    const selectionStart = carInfoInput.selectionStart;
+    const selectionEnd = carInfoInput.selectionEnd;
+    carInfoInput.value = upperValue;
+    carInfoInput.setSelectionRange(selectionStart, selectionEnd);
+  });
+
   // Permitir digitação de vírgula e travar o ponto
   ['total_amount', 'fees_amount', 'net_amount'].forEach((name) => {
     const inputElement = form[name] as HTMLInputElement;
@@ -613,7 +624,7 @@ export function bindHospedagens(refresh: () => void) {
         nights_count: nightsCount,
         reservation_status: reservationStatus,
         notes: String(data.get('notes') || '') || null,
-        car_info: String(data.get('car_info') || '') || null,
+        car_info: String(data.get('car_info') || '').toLocaleUpperCase('pt-BR') || null,
         total_amount: total_amount,
         fees_amount: fees_amount,
         net_amount: net_amount,
