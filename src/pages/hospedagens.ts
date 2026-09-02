@@ -156,7 +156,7 @@ export async function renderHospedagens() {
     </section>
     <section class="split wide-left">
       ${stayForm(edit)}
-      <section class="panel table-wrap stays-table">
+      <section class="panel table-wrap stays-table stays-grid-panel">
         <table>
           <thead><tr><th class="sticky-col sticky-col-entry">Entrada</th><th class="sticky-col sticky-col-exit">Saída</th><th>Dia da saída</th><th>Studio</th><th>Hóspedes</th><th>Diárias</th><th>Plataforma</th><th>Status</th><th>Pagamento</th><th>Total</th><th>Taxas</th><th>Líquido</th><th>Diária</th><th></th></tr></thead>
           <tbody>${stays.map(renderStayRow).join('')}</tbody>
@@ -294,9 +294,65 @@ export function bindHospedagens(refresh: () => void) {
   const isInteractiveRowTarget = (target: HTMLElement) =>
     Boolean(target.closest('button, input, select, textarea, a, [role="button"], [contenteditable="true"]'));
 
+  const tableWrap = qs<HTMLElement>('.stays-table');
   const table = qs<HTMLElement>('.stays-table table');
   let lastTouchStayId = '';
   let lastTouchAt = 0;
+  let isMouseScrolling = false;
+  let hasMouseScrolled = false;
+  let suppressClickAfterMouseScroll = false;
+  let mouseScrollStartX = 0;
+  let mouseScrollStartLeft = 0;
+
+  tableWrap?.addEventListener('mousedown', (event) => {
+    if (event.button !== 0) return;
+
+    const target = event.target as HTMLElement;
+    if (isInteractiveRowTarget(target)) return;
+
+    isMouseScrolling = true;
+    hasMouseScrolled = false;
+    mouseScrollStartX = event.clientX;
+    mouseScrollStartLeft = tableWrap.scrollLeft;
+
+    const handleMouseMove = (moveEvent: MouseEvent) => {
+      if (!isMouseScrolling) return;
+
+      const deltaX = moveEvent.clientX - mouseScrollStartX;
+      if (!hasMouseScrolled && Math.abs(deltaX) < 5) return;
+
+      hasMouseScrolled = true;
+      tableWrap.classList.add('is-drag-scrolling');
+      tableWrap.scrollLeft = mouseScrollStartLeft - deltaX;
+      moveEvent.preventDefault();
+    };
+
+    const handleMouseUp = () => {
+      if (!isMouseScrolling) return;
+
+      isMouseScrolling = false;
+      tableWrap.classList.remove('is-drag-scrolling');
+      window.removeEventListener('mousemove', handleMouseMove);
+      window.removeEventListener('mouseup', handleMouseUp);
+
+      if (hasMouseScrolled) {
+        suppressClickAfterMouseScroll = true;
+        window.setTimeout(() => {
+          suppressClickAfterMouseScroll = false;
+        }, 0);
+      }
+    };
+
+    window.addEventListener('mousemove', handleMouseMove);
+    window.addEventListener('mouseup', handleMouseUp);
+  });
+
+  tableWrap?.addEventListener('click', (event) => {
+    if (!suppressClickAfterMouseScroll) return;
+
+    event.preventDefault();
+    event.stopPropagation();
+  }, true);
 
   table?.addEventListener('click', async (event) => {
     const target = event.target as HTMLElement;
