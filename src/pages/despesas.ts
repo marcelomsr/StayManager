@@ -214,6 +214,27 @@ export function bindDespesas(refresh: () => void) {
     }
   };
 
+  const openExpenseEntryEdit = (entryId: string) => {
+    const entry = entries.find((item) => item.id === entryId);
+    if (!entry) return;
+
+    (form.elements.namedItem('id') as HTMLInputElement).value = entry.id;
+    studioSelect!.value = entry.studio_id;
+    syncExpenseTypeOptions(entry.studio_id);
+    expenseTypeSelect!.value = entry.expense_type_id;
+    (form.elements.namedItem('payment_status') as HTMLSelectElement).value = entry.payment_status ?? 'Não pago';
+    (form.elements.namedItem('amount') as HTMLInputElement).value = Number(entry.amount).toLocaleString('pt-BR', {
+      minimumFractionDigits: 2,
+      maximumFractionDigits: 2,
+      useGrouping: false
+    });
+    (form.elements.namedItem('notes') as HTMLTextAreaElement).value = entry.notes ?? '';
+    submitButton!.textContent = 'Salvar alteração';
+  };
+
+  const isInteractiveRowTarget = (target: HTMLElement) =>
+    Boolean(target.closest('button, input, select, textarea, a, [role="button"], [contenteditable="true"]'));
+
   studioSelect?.addEventListener('change', () => {
     syncExpenseTypeOptions(studioSelect.value);
   });
@@ -347,21 +368,7 @@ export function bindDespesas(refresh: () => void) {
 
     const editButton = target.closest<HTMLButtonElement>('[data-edit]');
     if (editButton && table.contains(editButton)) {
-      const entry = entries.find((item) => item.id === editButton.dataset.edit)!;
-      if (!entry) return;
-
-      (form.elements.namedItem('id') as HTMLInputElement).value = entry.id;
-      studioSelect!.value = entry.studio_id;
-      syncExpenseTypeOptions(entry.studio_id);
-      expenseTypeSelect!.value = entry.expense_type_id;
-      (form.elements.namedItem('payment_status') as HTMLSelectElement).value = entry.payment_status ?? 'Não pago';
-      (form.elements.namedItem('amount') as HTMLInputElement).value = Number(entry.amount).toLocaleString('pt-BR', {
-        minimumFractionDigits: 2,
-        maximumFractionDigits: 2,
-        useGrouping: false
-      });
-      (form.elements.namedItem('notes') as HTMLTextAreaElement).value = entry.notes ?? '';
-      submitButton!.textContent = 'Salvar alteração';
+      openExpenseEntryEdit(editButton.dataset.edit!);
       return;
     }
 
@@ -397,5 +404,14 @@ export function bindDespesas(refresh: () => void) {
       replaceRow: renderExpenseEntryRows,
       onError: (error) => toast(error instanceof Error ? error.message : 'Erro ao salvar despesa.', 'error')
     });
+  });
+
+  table?.addEventListener('dblclick', (event) => {
+    const target = event.target as HTMLElement;
+    if (isInteractiveRowTarget(target)) return;
+
+    const row = target.closest<HTMLTableRowElement>('[data-expense-entry-row]');
+    if (!row || !table.contains(row)) return;
+    openExpenseEntryEdit(row.dataset.expenseEntryRow!);
   });
 }
