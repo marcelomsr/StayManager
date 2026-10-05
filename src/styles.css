@@ -134,6 +134,81 @@ tr.unpaid td { background: #ffecec; }
 .note-card h3 { margin: 0 0 8px; }
 .note-card p { white-space: pre-wrap; color: #344054; }
 .note-actions { display: flex; flex-wrap: wrap; gap: 6px; }
+.reports-stack { display: grid; gap: 18px; }
+.report-filter { align-items: end; }
+.report-filter label { min-width: 220px; }
+.report-panel { display: grid; gap: 12px; }
+.bar-chart {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  gap: 12px;
+  min-height: 360px;
+  overflow-x: auto;
+}
+.chart-axis {
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  padding: 20px 0 34px;
+  color: var(--muted);
+  font-size: 12px;
+  white-space: nowrap;
+}
+.chart-plot {
+  position: relative;
+  min-width: 960px;
+  min-height: 320px;
+}
+.chart-grid {
+  position: absolute;
+  inset: 20px 0 34px;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+}
+.chart-grid span { border-top: 1px solid var(--line); }
+.chart-bars {
+  position: relative;
+  z-index: 1;
+  display: grid;
+  grid-template-columns: repeat(12, minmax(68px, 1fr));
+  gap: 12px;
+  min-height: 320px;
+  padding-top: 20px;
+}
+.chart-bar-item {
+  display: grid;
+  grid-template-rows: 34px 1fr auto;
+  gap: 8px;
+  min-width: 0;
+}
+.chart-bar-value {
+  align-self: end;
+  color: #344054;
+  font-size: 12px;
+  font-weight: 700;
+  text-align: center;
+  white-space: nowrap;
+}
+.chart-bar-track {
+  display: flex;
+  align-items: flex-end;
+  min-height: 220px;
+  border-bottom: 1px solid #98a2b3;
+}
+.chart-bar-fill {
+  width: 100%;
+  min-height: 0;
+  border-radius: 6px 6px 0 0;
+  background: #2266cc;
+}
+.chart-bar-label {
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 700;
+  text-align: center;
+  white-space: nowrap;
+}
 .checkbox-list { display: grid; gap: 8px; }
 .profile-panel { max-width: 620px; }
 .muted-text { color: var(--muted); }
@@ -164,4 +239,9 @@ tr.unpaid td { background: #ffecec; }
   .panel { padding: 14px; }
   .cards-grid { grid-template-columns: 1fr; }
   .calendar { grid-template-columns: repeat(7, minmax(86px, 1fr)); overflow-x: auto; }
+  .report-filter { width: 100%; }
+  .report-filter label { min-width: 0; width: 100%; }
+  .bar-chart { min-height: 330px; }
+  .chart-plot { min-width: 920px; }
+  .chart-bars { gap: 10px; }
 }

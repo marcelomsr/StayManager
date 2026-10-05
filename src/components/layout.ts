@@ -8,6 +8,7 @@ const routes = [
   ['/studios', 'Studios'],
   ['/despesas', 'Despesas'],
   ['/entradas-saidas', 'Entradas e Saídas R$'],
+  ['/relatorios', 'Relatórios'],
   ['/anotacoes', 'Anotações'],
   ['/empresas', 'Empresas'],
   ['/usuarios', 'Usuários'],

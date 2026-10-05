@@ -8,6 +8,7 @@ import { renderHospedagens, bindHospedagens } from './pages/hospedagens';
 import { renderStudios, bindStudios } from './pages/studios';
 import { renderDespesas, bindDespesas } from './pages/despesas';
 import { renderCash, bindCash } from './pages/cash';
+import { renderReports, bindReports } from './pages/reports';
 import { renderNotes, bindNotes } from './pages/notes';
 import { renderCompanies, bindCompanies } from './pages/companies';
 import { renderUsers, bindUsers } from './pages/users';
@@ -62,6 +63,9 @@ async function render() {
     } else if (route === '/entradas-saidas') {
       app.innerHTML = await renderCash();
       bindCash(refresh);
+    } else if (route === '/relatorios') {
+      app.innerHTML = await renderReports();
+      bindReports(refresh);
     } else if (route === '/anotacoes') {
       app.innerHTML = await renderNotes();
       bindNotes(refresh);

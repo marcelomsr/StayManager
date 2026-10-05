@@ -78,6 +78,25 @@ export async function listMonthStays(companyId: Id, year: number, month: number,
   return data as Stay[];
 }
 
+export async function listPeriodStays(companyId: Id, start: MonthRef, end: MonthRef, studioId?: Id) {
+  const periodStart = new Date(start.year, start.month - 1, 1).toISOString();
+  const nextPeriodStart = new Date(end.year, end.month, 1).toISOString();
+  let query = supabase
+    .from('stays')
+    .select('*,studios(*),platforms(*)')
+    .eq('company_id', companyId)
+    .is('deleted_at', null)
+    .lt('check_in_at', nextPeriodStart)
+    .gt('check_out_at', periodStart)
+    .order('check_in_at');
+
+  if (studioId) query = query.eq('studio_id', studioId);
+
+  const { data, error } = await query;
+  if (error) throw error;
+  return data as Stay[];
+}
+
 export async function hasStayConflict(companyId: Id, studioId: Id, checkIn: string, checkOut: string, stayId?: Id) {
   const isoCheckIn = new Date(checkIn).toISOString();
   const isoCheckOut = new Date(checkOut).toISOString();
