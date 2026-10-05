@@ -135,9 +135,32 @@ tr.unpaid td { background: #ffecec; }
 .note-card p { white-space: pre-wrap; color: #344054; }
 .note-actions { display: flex; flex-wrap: wrap; gap: 6px; }
 .reports-stack { display: grid; gap: 18px; }
-.report-filter { align-items: end; }
-.report-filter label { min-width: 220px; }
 .report-panel { display: grid; gap: 12px; }
+.report-control { max-width: 260px; }
+.report-hint { margin: 0; color: var(--muted); font-size: 13px; }
+.chart-legend { display: flex; flex-wrap: wrap; gap: 8px; }
+.legend-item {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  width: auto;
+  border-color: var(--line);
+  background: #fff;
+  color: #667085;
+}
+.legend-item.active {
+  color: #172033;
+  border-color: #98a2b3;
+  background: #f8fafc;
+}
+.legend-swatch {
+  width: 10px;
+  height: 10px;
+  border-radius: 999px;
+  background: var(--series-color);
+  opacity: .4;
+}
+.legend-item.active .legend-swatch { opacity: 1; }
 .bar-chart {
   display: grid;
   grid-template-columns: auto minmax(0, 1fr);
@@ -209,6 +232,38 @@ tr.unpaid td { background: #ffecec; }
   text-align: center;
   white-space: nowrap;
 }
+.line-chart-wrap {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  gap: 12px;
+  min-height: 340px;
+  overflow-x: auto;
+}
+.line-chart-scroll {
+  min-width: 1080px;
+}
+.line-chart {
+  display: block;
+  width: 1080px;
+  height: 340px;
+}
+.line-chart-grid line {
+  stroke: var(--line);
+  stroke-width: 1;
+}
+.line-chart-labels text {
+  fill: var(--muted);
+  font-size: 12px;
+  font-weight: 700;
+}
+.line-chart-point-value {
+  font-size: 12px;
+  font-weight: 700;
+  paint-order: stroke;
+  stroke: #fff;
+  stroke-width: 4px;
+  stroke-linejoin: round;
+}
 .checkbox-list { display: grid; gap: 8px; }
 .profile-panel { max-width: 620px; }
 .muted-text { color: var(--muted); }
@@ -239,9 +294,10 @@ tr.unpaid td { background: #ffecec; }
   .panel { padding: 14px; }
   .cards-grid { grid-template-columns: 1fr; }
   .calendar { grid-template-columns: repeat(7, minmax(86px, 1fr)); overflow-x: auto; }
-  .report-filter { width: 100%; }
-  .report-filter label { min-width: 0; width: 100%; }
+  .report-control { max-width: none; }
   .bar-chart { min-height: 330px; }
   .chart-plot { min-width: 920px; }
   .chart-bars { gap: 10px; }
+  .line-chart-scroll { min-width: 1040px; }
+  .line-chart { width: 1040px; }
 }
