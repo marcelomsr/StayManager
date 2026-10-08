@@ -61,6 +61,10 @@ const addDaysToDateInput = (value: string, amount: number) => {
 const shortWeekday = (value: string) => weekday(value).replace(/-feira$/, '');
 
 type InlineStayField = 'reservation_status' | 'payment_status';
+type StayRowHighlights = {
+  currentStayIds: Set<string>;
+  lastEndedStayIds: Set<string>;
+};
 
 const statusColor = (value: string) => RESERVATION_STATUS_OPTIONS.find((item) => item.name === value)?.color;
 const paymentColor = (value: string) => PAYMENT_STATUS_OPTIONS.find((item) => item.name === value)?.color;
@@ -87,8 +91,41 @@ const renderStayInfoIcons = (stay: Stay) => {
   </span>`;
 };
 
-const renderStayRow = (stay: Stay) => `
-  <tr class="${isWithinNextDays(stay.check_in_at, 7) ? 'upcoming' : ''}" data-stay-row="${stay.id}">
+const buildStayRowHighlights = (items: Stay[], now = new Date()): StayRowHighlights => {
+  const currentByStudio = new Map<string, Stay>();
+  const lastEndedByStudio = new Map<string, Stay>();
+  const nowTime = now.getTime();
+
+  items.forEach((stay) => {
+    const checkInTime = new Date(stay.check_in_at).getTime();
+    const checkOutTime = new Date(stay.check_out_at).getTime();
+    if (Number.isNaN(checkInTime) || Number.isNaN(checkOutTime)) return;
+
+    const currentStay = currentByStudio.get(stay.studio_id);
+    if (checkInTime <= nowTime && checkOutTime > nowTime && (!currentStay || checkInTime > new Date(currentStay.check_in_at).getTime())) {
+      currentByStudio.set(stay.studio_id, stay);
+    }
+
+    const lastEndedStay = lastEndedByStudio.get(stay.studio_id);
+    if (checkOutTime <= nowTime && (!lastEndedStay || checkOutTime > new Date(lastEndedStay.check_out_at).getTime())) {
+      lastEndedByStudio.set(stay.studio_id, stay);
+    }
+  });
+
+  return {
+    currentStayIds: new Set([...currentByStudio.values()].map((stay) => stay.id)),
+    lastEndedStayIds: new Set([...lastEndedByStudio.values()].map((stay) => stay.id))
+  };
+};
+
+const stayRowClass = (stay: Stay, highlights: StayRowHighlights) => {
+  if (highlights.currentStayIds.has(stay.id)) return 'current-stay';
+  if (highlights.lastEndedStayIds.has(stay.id)) return 'last-ended-stay';
+  return isWithinNextDays(stay.check_in_at, 7) ? 'upcoming' : '';
+};
+
+const renderStayRow = (highlights: StayRowHighlights) => (stay: Stay) => `
+  <tr class="${stayRowClass(stay, highlights)}" data-stay-row="${stay.id}">
     <td class="sticky-col sticky-col-entry">${formatDateTime(stay.check_in_at, '14:00')}</td>
     <td class="sticky-col sticky-col-exit">${formatDateTime(stay.check_out_at, '11:00')}</td>
     <td>${shortWeekday(stay.check_out_at)}</td>
@@ -140,6 +177,7 @@ export async function renderHospedagens() {
   }
   [studios, platforms, stays] = await Promise.all([listStudios(state.company.id), listPlatforms(state.company.id), listStays(state.company.id, filters)]);
   const edit = stays.find((stay) => stay.id === params.get('id'));
+  const rowHighlights = buildStayRowHighlights(stays);
   return appShell(`
     ${pageHeader('Hospedagens')}
     <section class="panel">
@@ -159,7 +197,7 @@ export async function renderHospedagens() {
       <section class="panel table-wrap stays-table stays-grid-panel">
         <table>
           <thead><tr><th class="sticky-col sticky-col-entry">Entrada</th><th class="sticky-col sticky-col-exit">Saída</th><th>Dia da saída</th><th>Studio</th><th>Hóspedes</th><th>Diárias</th><th>Plataforma</th><th>Status</th><th>Pagamento</th><th>Total</th><th>Taxas</th><th>Líquido</th><th>Diária</th><th></th></tr></thead>
-          <tbody>${stays.map(renderStayRow).join('')}</tbody>
+          <tbody>${stays.map(renderStayRow(rowHighlights)).join('')}</tbody>
         </table>
       </section>
     </section>
@@ -282,7 +320,7 @@ export function bindHospedagens(refresh: () => void) {
 
   const replaceStayRow = (stay: Stay) => {
     const row = qs<HTMLTableRowElement>(`[data-stay-row="${stay.id}"]`);
-    if (row) row.outerHTML = renderStayRow(stay);
+    if (row) row.outerHTML = renderStayRow(buildStayRowHighlights(stays))(stay);
   };
 
   const openStayEdit = (stayId: string) => {

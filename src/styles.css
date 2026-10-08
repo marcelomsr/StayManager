@@ -92,6 +92,8 @@ table { width: 100%; border-collapse: collapse; min-width: 760px; }
 th, td { border-bottom: 1px solid var(--line); padding: 10px; text-align: left; vertical-align: top; font-size: 13px; }
 th { color: var(--muted); font-weight: 700; background: #f8fafc; }
 tr.upcoming td { background: #fff8db; }
+tr.current-stay td { background: #eef7ff; }
+tr.last-ended-stay td { background: #f3f4f6; }
 tr.paid td { background: #eaf4ff; }
 tr.unpaid td { background: #ffecec; }
 .row-actions { white-space: nowrap; display: flex; gap: 6px; }
@@ -104,6 +106,8 @@ tr.unpaid td { background: #ffecec; }
 .stays-table .sticky-col-entry { left: 0; }
 .stays-table .sticky-col-exit { left: 104px; }
 .stays-table tr.upcoming td.sticky-col { background: #fff8db; }
+.stays-table tr.current-stay td.sticky-col { background: #eef7ff; }
+.stays-table tr.last-ended-stay td.sticky-col { background: #f3f4f6; }
 .stays-table .row-actions { display: table-cell; }
 .stays-table .row-actions > div { display: flex; align-items: center; gap: 6px; }
 .badge-button { appearance: none; border: 0; background: transparent; padding: 0; cursor: pointer; font: inherit; }
