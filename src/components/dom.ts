@@ -19,6 +19,16 @@ export function escapeHtml(value: unknown) {
     .replaceAll("'", '&#039;');
 }
 
+export function focusFirstFormField(form: HTMLFormElement) {
+  const field = Array.from(form.querySelectorAll<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>(
+    'input:not([type="hidden"]), select, textarea'
+  )).find((element) => !element.matches(':disabled, [readonly]') && element.getClientRects().length > 0);
+  if (!field) return;
+
+  field.focus({ preventScroll: true });
+  form.scrollIntoView({ behavior: 'auto', block: 'start' });
+}
+
 export function bindRecordEditing(container: HTMLElement) {
   container.addEventListener('dblclick', (event) => {
     const target = event.target;

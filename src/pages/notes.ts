@@ -1,4 +1,4 @@
-import { escapeHtml, qs, toast } from '../components/dom';
+import { escapeHtml, focusFirstFormField, qs, toast } from '../components/dom';
 import { appShell, pageHeader } from '../components/layout';
 import { listNotes, saveNote, softDelete } from '../services/repositories';
 import { state, isCompanyActive } from '../state/app-state';
@@ -71,6 +71,7 @@ export function bindNotes(refresh: () => void) {
     (form.elements.namedItem('id') as HTMLInputElement).value = note.id;
     (form.elements.namedItem('title') as HTMLInputElement).value = note.title;
     (form.elements.namedItem('body') as HTMLTextAreaElement).value = note.body;
+    focusFirstFormField(form);
   }));
   document.querySelectorAll<HTMLButtonElement>('[data-copy]').forEach((button) => button.addEventListener('click', async () => {
     const note = notes.find((item) => item.id === button.dataset.copy);

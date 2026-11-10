@@ -1,5 +1,5 @@
 import { CASH_DESCRIPTIONS } from '../config';
-import { escapeHtml, qs, toast } from '../components/dom';
+import { escapeHtml, focusFirstFormField, qs, toast } from '../components/dom';
 import { appShell, pageHeader } from '../components/layout';
 import { listCashEntries, listMonthStays, saveCashEntry, deleteCashEntry } from '../services/repositories';
 import { state, isCompanyActive } from '../state/app-state';
@@ -148,6 +148,7 @@ export function bindCash(refresh: () => void) {
         maximumFractionDigits: 2
       });
       if (submitButton) submitButton.textContent = 'Salvar alteração';
+      focusFirstFormField(form);
     });
   });
 

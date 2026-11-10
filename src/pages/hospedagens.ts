@@ -1,5 +1,5 @@
 import { PAYMENT_STATUS_OPTIONS, RESERVATION_STATUS_OPTIONS } from '../config';
-import { escapeHtml, qs, toast } from '../components/dom';
+import { escapeHtml, focusFirstFormField, qs, toast } from '../components/dom';
 import { appShell, pageHeader } from '../components/layout';
 import { getStay, listPlatforms, listStays, listStudios, saveStay, softDelete, updateStayInline } from '../services/repositories';
 import { state, isCompanyActive } from '../state/app-state';
@@ -328,7 +328,13 @@ export function bindHospedagens(refresh: () => void) {
   const openStayEdit = (stayId: string) => {
     const params = new URLSearchParams(state.route.split('?')[1] ?? '');
     params.set('id', stayId);
-    location.hash = `/hospedagens?${params.toString()}`;
+    const editRoute = `/hospedagens?${params.toString()}`;
+    if (location.hash === `#${editRoute}`) {
+      const form = qs<HTMLFormElement>('#stay-form');
+      if (form) focusFirstFormField(form);
+      return;
+    }
+    location.hash = editRoute;
   };
 
   const isInteractiveRowTarget = (target: HTMLElement) =>
@@ -498,6 +504,7 @@ export function bindHospedagens(refresh: () => void) {
 
   const form = qs<HTMLFormElement>('#stay-form');
   if (!form) return;
+  if ((form.elements.namedItem('id') as HTMLInputElement).value) focusFirstFormField(form);
 
   const updateCheckOutFromCheckIn = () => {
     const checkInInput = form.check_in_at as HTMLInputElement;

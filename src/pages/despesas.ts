@@ -1,4 +1,4 @@
-import { escapeHtml, qs, toast } from '../components/dom';
+import { escapeHtml, focusFirstFormField, qs, toast } from '../components/dom';
 import { appShell, pageHeader } from '../components/layout';
 import { cloneExpenseEntries, listExpenseEntries, listExpenseTypes, listMonthStays, listStudios, saveExpenseEntry, saveExpenseType, deleteExpenseEntry, updateExpenseEntryInline } from '../services/repositories';
 import { state, isCompanyActive } from '../state/app-state';
@@ -230,6 +230,7 @@ export function bindDespesas(refresh: () => void) {
     });
     (form.elements.namedItem('notes') as HTMLTextAreaElement).value = entry.notes ?? '';
     submitButton!.textContent = 'Salvar alteração';
+    focusFirstFormField(form);
   };
 
   studioSelect?.addEventListener('change', () => {

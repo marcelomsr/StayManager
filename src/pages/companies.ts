@@ -1,4 +1,4 @@
-import { escapeHtml, qs, toast } from '../components/dom';
+import { escapeHtml, focusFirstFormField, qs, toast } from '../components/dom';
 import { appShell, pageHeader } from '../components/layout';
 import { listCompaniesAdmin, saveCompany, softDelete, hasCompanyData, deleteCompany } from '../services/repositories';
 import { Company } from '../types';
@@ -83,6 +83,7 @@ export function bindCompanies(refresh: () => void) {
     cancelBtn?.classList.remove('hidden');
     const submitBtn = form.querySelector('button.primary');
     if (submitBtn) submitBtn.textContent = 'Salvar alteration';
+    focusFirstFormField(form);
   }));
 
   document.querySelectorAll<HTMLButtonElement>('[data-delete]').forEach((button) => button.addEventListener('click', async () => {

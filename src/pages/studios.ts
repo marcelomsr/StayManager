@@ -1,4 +1,4 @@
-import { escapeHtml, qs, toast } from '../components/dom';
+import { escapeHtml, focusFirstFormField, qs, toast } from '../components/dom';
 import { appShell, pageHeader } from '../components/layout';
 import { listStudios, saveStudio, softDelete } from '../services/repositories';
 import { state, isCompanyActive } from '../state/app-state';
@@ -60,6 +60,7 @@ export function bindStudios(refresh: () => void) {
     (form.elements.namedItem('name') as HTMLInputElement).value = studio.name;
     (form.elements.namedItem('has_garage') as HTMLInputElement).checked = studio.has_garage;
     (form.elements.namedItem('active') as HTMLInputElement).checked = studio.active;
+    focusFirstFormField(form);
   }));
   document.querySelectorAll<HTMLButtonElement>('[data-delete]').forEach((button) => button.addEventListener('click', async () => {
     await softDelete('studios', button.dataset.delete!);
