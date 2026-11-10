@@ -19,6 +19,18 @@ export function escapeHtml(value: unknown) {
     .replaceAll("'", '&#039;');
 }
 
+export function bindRecordEditing(container: HTMLElement) {
+  container.addEventListener('dblclick', (event) => {
+    const target = event.target;
+    if (!(target instanceof Element)) return;
+    if (target.closest('button, input, select, textarea, a, [role="button"], [contenteditable="true"]')) return;
+
+    const record = target.closest('tr, .note-card');
+    if (!record || !container.contains(record)) return;
+    record.querySelector<HTMLButtonElement>('button[data-edit]')?.click();
+  });
+}
+
 export function toast(message: string, kind: 'info' | 'error' = 'info') {
   const node = document.createElement('div');
   node.className = `toast ${kind}`;

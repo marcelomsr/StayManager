@@ -459,15 +459,6 @@ export function bindHospedagens(refresh: () => void) {
     });
   });
 
-  table?.addEventListener('dblclick', (event) => {
-    const target = event.target as HTMLElement;
-    if (isInteractiveRowTarget(target)) return;
-
-    const row = target.closest<HTMLTableRowElement>('[data-stay-row]');
-    if (!row || !table.contains(row)) return;
-    openStayEdit(row.dataset.stayRow!);
-  });
-
   table?.addEventListener('pointerup', (event) => {
     if (event.pointerType !== 'touch') return;
 

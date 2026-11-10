@@ -1,7 +1,7 @@
 import './styles.css';
 import { loadSessionContext, state, subscribe } from './state/app-state';
 import { bindLayout, requireCompany } from './components/layout';
-import { toast } from './components/dom';
+import { bindRecordEditing, toast } from './components/dom';
 import { renderLogin, bindLogin } from './pages/login';
 import { renderDashboard, bindDashboard } from './pages/dashboard';
 import { renderHospedagens, bindHospedagens } from './pages/hospedagens';
@@ -15,6 +15,7 @@ import { renderUsers, bindUsers } from './pages/users';
 import { renderProfile, bindProfile } from './pages/profile';
 
 const app = document.getElementById('app')!;
+bindRecordEditing(app);
 let rendering = false;
 
 async function render() {
