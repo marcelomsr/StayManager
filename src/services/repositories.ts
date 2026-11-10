@@ -58,6 +58,18 @@ export async function listStays(companyId: Id, filters: Record<string, string> =
   return data as Stay[];
 }
 
+export async function getStay(companyId: Id, stayId: Id) {
+  const { data, error } = await supabase
+    .from('stays')
+    .select('*,studios(*),platforms(*)')
+    .eq('company_id', companyId)
+    .eq('id', stayId)
+    .is('deleted_at', null)
+    .maybeSingle();
+  if (error) throw error;
+  return data as Stay | null;
+}
+
 export async function listMonthStays(companyId: Id, year: number, month: number, studioId?: Id, platformId?: Id) {
   const monthStart = new Date(year, month - 1, 1).toISOString();
   const nextMonthStart = new Date(year, month, 1).toISOString();

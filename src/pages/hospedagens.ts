@@ -1,7 +1,7 @@
 import { PAYMENT_STATUS_OPTIONS, RESERVATION_STATUS_OPTIONS } from '../config';
 import { escapeHtml, qs, toast } from '../components/dom';
 import { appShell, pageHeader } from '../components/layout';
-import { listPlatforms, listStays, listStudios, saveStay, softDelete, updateStayInline } from '../services/repositories';
+import { getStay, listPlatforms, listStays, listStudios, saveStay, softDelete, updateStayInline } from '../services/repositories';
 import { state, isCompanyActive } from '../state/app-state';
 import { Platform, Stay, Studio } from '../types';
 import { calculateNights, isWithinNextDays, pad, toDateInput, toDateTimeInput, weekday } from '../utils/date';
@@ -176,7 +176,9 @@ export async function renderHospedagens() {
     filters.end = localDateInput(tenDaysFromNow);
   }
   [studios, platforms, stays] = await Promise.all([listStudios(state.company.id), listPlatforms(state.company.id), listStays(state.company.id, filters)]);
-  const edit = stays.find((stay) => stay.id === params.get('id'));
+  const stayId = params.get('id');
+  const edit = stays.find((stay) => stay.id === stayId)
+    ?? (stayId ? await getStay(state.company.id, stayId) ?? undefined : undefined);
   const rowHighlights = buildStayRowHighlights(stays);
   return appShell(`
     ${pageHeader('Hospedagens')}
