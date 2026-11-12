@@ -34,6 +34,13 @@ Use o mesmo `VITE_GOOGLE_CLIENT_ID` ja configurado no projeto de gestao financei
 npm run dev
 ```
 
+Para atualizar um banco existente para o quadro de anotações com edição direta e
+ordenação por arraste, execute
+[`supabase/migrations/20261112_notes_board.sql`](supabase/migrations/20261112_notes_board.sql)
+no SQL Editor do Supabase antes de usar a nova versão. A migração preserva os
+textos e a ordem atual; novas anotações aparecem primeiro e as mudanças de ordem
+ficam salvas por empresa. O schema completo já inclui essa atualização.
+
 ## Regras principais
 
 - Login com Google Identity Services, igual ao projeto de gestao financeira.

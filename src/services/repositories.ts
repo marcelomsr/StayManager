@@ -341,14 +341,26 @@ export async function deleteCashEntry(companyId: Id, cashEntryId: Id) {
 }
 
 export async function listNotes(companyId: Id) {
-  const { data, error } = await supabase.from('notes').select('*').eq('company_id', companyId).is('deleted_at', null).order('updated_at', { ascending: false });
+  const { data, error } = await supabase.from('notes').select('*').eq('company_id', companyRequired(companyId)).is('deleted_at', null).order('position').order('created_at', { ascending: false }).order('id');
   if (error) throw error;
   return data as Note[];
 }
 
 export async function saveNote(companyId: Id, values: Partial<Note>) {
-  const payload = { ...values, company_id: companyId };
-  const { error } = values.id ? await supabase.from('notes').update(payload).eq('id', values.id) : await supabase.from('notes').insert(payload);
+  const payload = { ...values, company_id: companyRequired(companyId) };
+  const query = values.id
+    ? supabase.from('notes').update(payload).eq('id', values.id).eq('company_id', companyId).is('deleted_at', null)
+    : supabase.from('notes').insert(payload);
+  const { data, error } = await query.select('*').single();
+  if (error) throw error;
+  return data as Note;
+}
+
+export async function saveNotesOrder(companyId: Id, noteIds: Id[]) {
+  const { error } = await supabase.rpc('reorder_notes', {
+    p_company_id: companyRequired(companyId),
+    p_note_ids: noteIds
+  });
   if (error) throw error;
 }
 

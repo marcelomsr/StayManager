@@ -133,11 +133,35 @@ tr.unpaid td { background: #ffecec; }
 .calendar-cell.muted { background: #f3f5f9; }
 .calendar-day { font-weight: 700; margin-bottom: 6px; }
 .calendar-event { display: block; width: 100%; border-color: transparent; background: var(--event); margin: 4px 0; padding: 6px; text-align: left; font-size: 12px; overflow: hidden; text-overflow: ellipsis; }
-.notes-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(240px, 1fr)); gap: 12px; }
-.note-card { background: #fff; border: 1px solid var(--line); border-radius: 8px; padding: 14px; }
-.note-card h3 { margin: 0 0 8px; }
-.note-card p { white-space: pre-wrap; color: #344054; }
-.note-actions { display: flex; flex-wrap: wrap; gap: 6px; }
+.notes-board { padding: 0 24px calc(100px + env(safe-area-inset-bottom, 0px)); }
+.notes-help, .notes-order-status { margin: 0 0 14px; color: var(--muted); font-size: 13px; line-height: 1.5; }
+.notes-order-status:empty { display: none; }
+.notes-order-retry { margin-bottom: 14px; }
+.notes-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(min(100%, 280px), 1fr)); gap: 16px; align-items: start; }
+.note-card { min-width: 0; background: #fff; border: 1px solid var(--line); border-radius: 10px; padding: 12px; box-shadow: 0 2px 5px rgba(23, 32, 51, .03); }
+.note-card:focus-within { border-color: #8cb2ed; }
+.note-card.has-save-error { border-color: var(--danger); }
+.note-card.has-save-error .note-save-status { color: var(--danger); }
+.note-card-toolbar { display: flex; align-items: center; gap: 6px; min-height: 44px; }
+.note-drag-handle { display: flex; align-items: center; justify-content: center; flex-shrink: 0; width: 44px; height: 44px; padding: 0; background: transparent; border-color: transparent; color: var(--muted); cursor: grab; touch-action: none; user-select: none; -webkit-user-select: none; }
+.note-drag-handle:hover { background: #f4f6f8; }
+.note-drag-handle:active { cursor: grabbing; }
+.note-save-status { flex: 1; font-size: 12px; color: var(--muted); text-align: right; }
+.note-save-retry { font-size: 12px; padding: 6px; }
+.note-title, .note-body { display: block; border: 1px solid transparent; background: transparent; padding: 8px; }
+.note-title { font-size: 18px; font-weight: 700; }
+.note-body { min-height: 132px; resize: none; overflow: hidden; color: #344054; line-height: 1.55; }
+.note-title:hover, .note-body:hover { background: #f8fafc; }
+.note-title:focus, .note-body:focus { outline: 0; border-color: #8cb2ed; background: #f8fbff; }
+.note-actions { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 12px; padding-top: 12px; border-top: 1px solid #eef0f4; }
+.note-actions button { min-height: 44px; }
+.note-card.is-dragging { opacity: .25; border: 2px dashed var(--primary); pointer-events: none; }
+.note-drag-preview { position: fixed; top: 0; left: 0; z-index: 100; pointer-events: none; opacity: .94; box-shadow: 0 16px 40px rgba(23, 32, 51, .2); overflow: hidden; }
+.notes-empty { padding: 32px 12px; color: var(--muted); text-align: center; }
+.notes-add { position: fixed; right: max(24px, env(safe-area-inset-right, 0px)); bottom: calc(24px + env(safe-area-inset-bottom, 0px)); z-index: 10; display: flex; align-items: center; justify-content: center; width: 58px; height: 58px; padding: 0; border-radius: 50%; box-shadow: 0 6px 18px rgba(34, 102, 204, .28); }
+.notes-add:hover { background: #1b55ac; }
+.note-drag-handle:focus-visible, .notes-add:focus-visible { outline: 3px solid #8cb2ed; outline-offset: 3px; }
+.notes-board button:disabled, .notes-add:disabled { cursor: default; opacity: .6; }
 .reports-stack { display: grid; gap: 18px; }
 .report-panel { display: grid; gap: 12px; }
 .report-control { max-width: 260px; }
@@ -294,6 +318,9 @@ tr.unpaid td { background: #ffecec; }
   .topbar { height: auto; padding: 14px; display: grid; }
   .top-actions { display: grid; grid-template-columns: 1fr auto; }
   .page-header { padding: 18px 14px; align-items: flex-start; flex-direction: column; }
+  .notes-board { padding-left: 14px; padding-right: 14px; }
+  .notes-grid { grid-template-columns: 1fr; }
+  .notes-add { right: max(18px, env(safe-area-inset-right, 0px)); bottom: calc(18px + env(safe-area-inset-bottom, 0px)); }
   .panel, .split, .cards-grid { margin-left: 14px; margin-right: 14px; padding-left: 0; padding-right: 0; }
   .panel { padding: 14px; }
   .cards-grid { grid-template-columns: 1fr; }

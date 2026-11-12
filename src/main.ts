@@ -69,7 +69,7 @@ async function render() {
       bindReports(refresh);
     } else if (route === '/anotacoes') {
       app.innerHTML = await renderNotes();
-      bindNotes(refresh);
+      bindNotes();
     } else if (route === '/empresas') {
       app.innerHTML = await renderCompanies();
       bindCompanies(refresh);

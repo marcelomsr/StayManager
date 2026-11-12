@@ -100,6 +100,7 @@ export type Note = {
   company_id: Id;
   title: string;
   body: string;
+  position: number;
   active: boolean;
   deleted_at: string | null;
 };
